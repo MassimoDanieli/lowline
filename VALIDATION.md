@@ -1,8 +1,10 @@
 # Validation — Lowline 0.1.1
 
-Verified code commit: `aeb38ab69e38e84f6f151b8ca307b6fc90b1eef6`. [Successful three-platform run](https://github.com/MassimoDanieli/lowline/actions/runs/39127864528).
+Verified code commit: `3356ebcb89ce405bc8883516487c7eec81d796af`. [Successful three-platform run](https://github.com/MassimoDanieli/lowline/actions/runs/39129426200).
 
-## Actually run in this session
+The emerald/amber palette was built and tested on all three platforms. The updated native editor preview was rendered on Linux in CI and visually inspected. Mac archive inspection below refers to the previous 0.1.1 package; the current run repeats the standalone universal-architecture check.
+
+## Validation history
 
 - Configured and compiled the native Linux standalone app and VST3 module in Release mode with GCC 13.3 and C++20.
 - GitHub Actions compiled the app/plugins and passed the regression suite on Linux x64, Windows x64 and macOS. The Mac target builds both arm64 and x86_64; tests execute on the runner's native architecture, not separately on two physical Macs.
