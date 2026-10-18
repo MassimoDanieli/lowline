@@ -2,8 +2,8 @@
 using namespace juce;
 namespace
 {
-Colour bg(0xff101715), card(0xff19241f), mint(0xffa5e2b0), gold(0xffe7be78), text(0xffe9eee8),
-    muted(0xff93a698);
+Colour bg(0xff11151b), card(0xff1c232d), mint(0xff2ef2a0), gold(0xffffbf47), text(0xfff3f6fa),
+    muted(0xffacbacb);
 }
 LowlineLook::LowlineLook()
 {
@@ -15,7 +15,7 @@ LowlineLook::LowlineLook()
     setColour(TextButton::textColourOnId, bg);
     setColour(ComboBox::backgroundColourId, card);
     setColour(ComboBox::textColourId, text);
-    setColour(ComboBox::outlineColourId, Colour(0xff395044));
+    setColour(ComboBox::outlineColourId, Colour(0xff46566b));
     setColour(PopupMenu::backgroundColourId, card);
     setColour(PopupMenu::textColourId, text);
 }
@@ -29,17 +29,17 @@ void LowlineLook::drawRotarySlider(Graphics &g, int x, int y, int w, int h, floa
     float r = d / 2;
     Path track;
     track.addCentredArc(c.x, c.y, r, r, 0, start, end, true);
-    g.setColour(Colour(0xff35473d));
+    g.setColour(Colour(0xff39485b));
     g.strokePath(track, PathStrokeType(3.5f));
     Path fill;
     fill.addCentredArc(c.x, c.y, r, r, 0, start, start + pos * (end - start), true);
     g.setColour(s.isMouseOverOrDragging() ? gold : mint);
     g.strokePath(fill, PathStrokeType(3.5f));
     auto inner = b.reduced(6);
-    g.setGradientFill(ColourGradient(Colour(0xff44564a), inner.getTopLeft(), Colour(0xff1c2922),
+    g.setGradientFill(ColourGradient(Colour(0xff536276), inner.getTopLeft(), Colour(0xff222c3a),
                                      inner.getBottomRight(), false));
     g.fillEllipse(inner);
-    g.setColour(Colour(0xff536358));
+    g.setColour(Colour(0xff687b92));
     g.drawEllipse(inner, 1);
     float angle = start + pos * (end - start);
     g.setColour(text);
@@ -50,11 +50,11 @@ void LowlineLook::drawButtonBackground(Graphics &g, Button &b, const Colour &, b
 {
     auto r = b.getLocalBounds().toFloat().reduced(.5f);
     g.setColour(b.getToggleState() ? mint
-                                   : (down    ? Colour(0xff3a5142)
-                                      : hover ? Colour(0xff304638)
-                                              : Colour(0xff24362b)));
+                                   : (down    ? Colour(0xff43566e)
+                                      : hover ? Colour(0xff34475e)
+                                              : Colour(0xff293647)));
     g.fillRoundedRectangle(r, 7);
-    g.setColour(b.getToggleState() ? mint : Colour(0xff415448));
+    g.setColour(b.getToggleState() ? mint : Colour(0xff526780));
     g.drawRoundedRectangle(r, 7, 1);
 }
 LowlineEditor::LowlineEditor(LowlineProcessor &p) : AudioProcessorEditor(p), proc(p)
@@ -165,7 +165,7 @@ void LowlineEditor::panel(Graphics &g, Rectangle<int> r, const String &title, Co
 {
     g.setColour(card);
     g.fillRoundedRectangle(r.toFloat(), 13);
-    g.setColour(Colour(0xff304237));
+    g.setColour(Colour(0xff36465b));
     g.drawRoundedRectangle(r.toFloat().reduced(.5f), 13, 1);
     g.setColour(accent);
     g.setFont(Font(13.f, Font::bold));
@@ -253,7 +253,7 @@ void LowlineEditor::timerCallback()
     }
     statusLabel.setText((proc.busy ? "Loading...  " : "") + proc.status(), dontSendNotification);
     bool clip = proc.clipped.exchange(false);
-    meterLabel.setColour(Label::textColourId, clip ? Colour(0xffff8d73) : mint);
+    meterLabel.setColour(Label::textColourId, clip ? Colour(0xffff785d) : mint);
     meterLabel.setText("IN " + String(lowline::toDb(proc.inputPeak), 1) + " dB  /  OUT " +
                            String(lowline::toDb(proc.outputPeak), 1) + " dB\nGR " +
                            String(proc.gainReduction.load(), 1) + " dB" +

@@ -19,3 +19,8 @@ Correctness and stability update; not feature parity with Profondo.
 MIDI learn, user-preset banks selected by Program Change, portable embedded presets, tuner, gate, crossover, tempo-sync, factory cabinet/room IRs, NAM metadata normalisation and CPU metering have not been added in this maintenance update. Presets still refer to absolute asset paths. There is no claim of Mac/Windows or real hardware verification.
 
 Loading uses a short protected object swap with a nonblocking direct fallback if it overlaps the audio callback; capture replacement is still not guaranteed seamless. The fallback now also goes through the same limiter. Booster oversampling and automatic sample-rate conversion remain future work.
+
+### Interfaccia: smeraldo e ambra
+
+- Sfondo antracite, accenti smeraldo e ambra piu vividi, testi piu leggibili.
+- Maggiore contrasto tra pulsanti attivi, spenti e al passaggio del mouse.

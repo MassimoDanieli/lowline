@@ -42,6 +42,17 @@ jobs:
       - name: Test Mac / Windows
         if: runner.os != 'Linux'
         run: ctest --test-dir build -C Release --output-on-failure
+      - name: Render interface preview
+        if: runner.os == 'Linux'
+        run: xvfb-run -a build/LowlineTests_artefacts/Release/LowlineTests --screenshot
+      - name: Upload interface preview
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lowline-interface-preview
+          if-no-files-found: error
+          retention-days: 30
+          path: lowline-preview.png
       - name: Verify Mac architectures and package
         if: runner.os == 'macOS'
         run: |
