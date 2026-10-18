@@ -1,0 +1,189 @@
+#pragma once
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <vector>
+namespace lowline
+{
+constexpr float pi = 3.14159265358979323846f;
+inline float db(float d)
+{
+    return std::pow(10.0f, d * .05f);
+}
+inline float toDb(float a)
+{
+    return 20 * std::log10(std::max(a, 1.e-9f));
+}
+struct Slew
+{
+    float value = 0, coefficient = 0;
+    void prepare(double sr, float initial)
+    {
+        value = initial;
+        coefficient = std::exp(-1.0f / (float(sr) * .015f));
+    }
+    float next(float target) { return value = target + coefficient * (value - target); }
+};
+struct Compressor
+{
+    float envelope = 0, reduction = 0;
+    double sr = 48000;
+    void prepare(double rate)
+    {
+        sr = rate;
+        envelope = reduction = 0;
+    }
+    float tick(float x, float threshold, float ratio, float attack, float release, float makeup)
+    {
+        float level = std::abs(x);
+        float c = std::exp(-1.0f / (float(sr) * .001f * (level > envelope ? attack : release)));
+        envelope = level + c * (envelope - level);
+        float over = toDb(envelope) - threshold;
+        constexpr float knee = 6;
+        float curve = over < -knee / 2  ? 0
+                      : over > knee / 2 ? over
+                                        : (over + knee / 2) * (over + knee / 2) / (2 * knee);
+        reduction = curve * (1 - 1 / ratio);
+        return x * db(makeup - reduction);
+    }
+};
+struct Biquad
+{
+    float b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0, z1 = 0, z2 = 0;
+    void reset() { z1 = z2 = 0; }
+    float tick(float x)
+    {
+        float y = b0 * x + z1;
+        z1 = b1 * x - a1 * y + z2;
+        z2 = b2 * x - a2 * y;
+        return y;
+    }
+    void peak(double sr, float f, float gain, float q = .707f)
+    {
+        float a = std::pow(10.f, gain / 40), w = 2 * pi * f / float(sr), al = std::sin(w) / (2 * q),
+              co = std::cos(w), d = 1 + al / a;
+        b0 = (1 + al * a) / d;
+        b1 = -2 * co / d;
+        b2 = (1 - al * a) / d;
+        a1 = -2 * co / d;
+        a2 = (1 - al / a) / d;
+    }
+};
+struct Delay
+{
+    std::vector<float> l, r;
+    size_t pos = 0;
+    float dampL = 0, dampR = 0;
+    double sr = 48000;
+    Slew time;
+    void prepare(double rate)
+    {
+        sr = rate;
+        l.assign(size_t(sr * 2.1) + 2, 0);
+        r = l;
+        pos = 0;
+        dampL = dampR = 0;
+        time.prepare(sr, float(sr * .38));
+    }
+    float read(const std::vector<float> &v, float samples) const
+    {
+        double p = double(pos) - samples;
+        if (p < 0)
+            p += v.size();
+        auto i = size_t(p);
+        auto j = (i + 1) % v.size();
+        return v[i] + float(p - i) * (v[j] - v[i]);
+    }
+    void tick(float &left, float &right, float ms, float feedback, float mix, bool ping, float highcut,
+              float send = 1)
+    {
+        float n = time.next(std::clamp(ms * .001f * float(sr), 1.f, float(l.size() - 2)));
+        float dl = read(l, n), dr = read(r, n);
+        float c = 1 - std::exp(-2 * pi * highcut / float(sr));
+        dampL += c * (dl - dampL);
+        dampR += c * (dr - dampR);
+        l[pos] = left * send + feedback * (ping ? dampR : dampL);
+        // Ping-pong injects the source on the left only, so the repeats really alternate.
+        r[pos] = (ping ? 0.f : right * send) + feedback * (ping ? dampL : dampR);
+        left += mix * dl;
+        right += mix * dr;
+        pos = (pos + 1) % l.size();
+    }
+};
+struct DryDelay
+{
+    std::vector<float> ring;
+    size_t pos = 0;
+    void prepare(double sr)
+    {
+        ring.assign(size_t(sr * .025) + 4, 0);
+        pos = 0;
+    }
+    float tick(float x, float samples)
+    {
+        ring[pos] = x;
+        double p = double(pos) - std::clamp(samples, 0.f, float(ring.size() - 2));
+        if (p < 0)
+            p += ring.size();
+        auto i = size_t(p);
+        float y = ring[i] + float(p - i) * (ring[(i + 1) % ring.size()] - ring[i]);
+        pos = (pos + 1) % ring.size();
+        return y;
+    }
+};
+// Stereo-linked peak limiter. One millisecond of lookahead is reported to the host.
+// The detector covers the entire lookahead window; release is smoothed, attack anticipates peaks.
+struct PeakLimiter
+{
+    std::vector<float> left, right, peaks;
+    std::vector<uint64_t> indices;
+    uint64_t clock = 0;
+    size_t head = 0, tail = 0;
+    int delaySamples = 0;
+    float gain = 1, release = 0;
+    void prepare(double sr)
+    {
+        delaySamples = std::max(1, int(std::round(sr * .001)));
+        const auto size = size_t(delaySamples + 2);
+        left.assign(size, 0);
+        right.assign(size, 0);
+        peaks.assign(size, 0);
+        indices.assign(size, 0);
+        clock = 0;
+        head = tail = 0;
+        gain = 1;
+        release = std::exp(-1.f / (float(sr) * .08f));
+    }
+    void tick(float &l, float &r)
+    {
+        if (!std::isfinite(l))
+            l = 0;
+        if (!std::isfinite(r))
+            r = 0;
+        const size_t size = left.size(), write = size_t(clock % size);
+        left[write] = l;
+        right[write] = r;
+        while (head != tail && indices[head] + uint64_t(delaySamples) < clock)
+            head = (head + 1) % size;
+        const float peak = std::max(std::abs(l), std::abs(r));
+        while (head != tail && peaks[(tail + size - 1) % size] <= peak)
+            tail = (tail + size - 1) % size;
+        indices[tail] = clock;
+        peaks[tail] = peak;
+        tail = (tail + 1) % size;
+        const float maximum = head == tail ? 0 : peaks[head];
+        const float target = maximum > .98f ? .98f / maximum : 1;
+        gain = target < gain ? target : target + release * (gain - target);
+        const size_t read = size_t((clock + size - size_t(delaySamples)) % size);
+        l = clock >= uint64_t(delaySamples) ? left[read] * gain : 0;
+        r = clock >= uint64_t(delaySamples) ? right[read] * gain : 0;
+        ++clock;
+    }
+};
+inline float safety(float x)
+{
+    if (!std::isfinite(x))
+        return 0;
+    return std::clamp(x, -.98f, .98f);
+}
+} // namespace lowline
