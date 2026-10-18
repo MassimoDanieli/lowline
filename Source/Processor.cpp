@@ -41,14 +41,39 @@ AudioProcessorValueTreeState::ParameterLayout LowlineProcessor::parameters()
     b("reverbOn", "IR reverb", false);
     f("reverbMix", "Reverb mix %", 0, 70, 15);
     b("bypass", "Bypass", false);
+    b("gateOn", "Noise gate", false);
+    f("gateThreshold", "Gate threshold dB", -80, -10, -55);
+    f("gateRelease", "Gate release ms", 20, 1000, 150);
+    f("lowMid", "Low mid dB", -12, 12, 0);
+    f("highMid", "High mid dB", -12, 12, 0);
+    f("lowMidFreq", "Low mid Hz", 80, 800, 250, 1);
+    f("midFreq", "Mid Hz", 150, 2500, 700, 1);
+    f("highMidFreq", "High mid Hz", 500, 6000, 1500, 1);
+    b("crossOn", "Clean low-pass", false);
+    f("crossFreq", "Clean crossover Hz", 50, 1000, 180, 1);
+    b("normOn", "NAM level normalisation", false);
+    f("normTarget", "NAM target dB", -30, -6, -18);
+    b("tunerOn", "Tuner", false);
+    b("tunerMute", "Tuner mute", false);
+    f("tunerRef", "Tuner A4 Hz", 430, 450, 440, .1f);
+    b("sync", "Delay tempo sync", false);
+    b("hostSync", "Use host tempo", true);
+    f("tempo", "Tempo BPM", 30, 240, 120, .1f);
+    l.add(std::make_unique<AudioParameterChoice>(ParameterID{"division", 1}, "Delay division",
+        StringArray{"1/16", "1/8", "1/8 dotted", "1/4", "1/4 dotted", "1/2"}, 3));
+    f("lowcut", "Delay low cut Hz", 0, 1000, 0, 1);
     return l;
 }
 LowlineProcessor::LowlineProcessor()
     : AudioProcessor(BusesProperties()
                          .withInput("Input", AudioChannelSet::stereo(), true)
                          .withOutput("Output", AudioChannelSet::stereo(), true)),
-      state(*this, nullptr, "Lowline", parameters()), worker([this] { workerLoop(); })
+      state(*this, nullptr, "Lowline", parameters())
 {
+    for (auto *parameter : getParameters())
+        if (auto *ranged = dynamic_cast<RangedAudioParameter *>(parameter)) midiTargets.push_back(ranged);
+    resetMidiMappings();
+    worker = std::thread([this] { workerLoop(); });
 }
 LowlineProcessor::~LowlineProcessor()
 {
@@ -86,22 +111,14 @@ void LowlineProcessor::prepareToPlay(double sr, int n)
     drive.prepare(sr, lowline::db(p("drive")));
     delayMix.prepare(sr, p("delayOn") ? p("delayMix") * .01f : 0);
     reverbMix.prepare(sr, p("reverbOn") ? p("reverbMix") * .01f : 0);
-    dsp::ProcessSpec spec{sr, (uint32)maxBlock.load(), 2};
-    if (cab)
-        cab->prepare(spec);
-    if (room)
-        room->prepare(spec);
-    for (int i = 0; i < 2; ++i)
-        if (models[i])
-        {
-            auto expected = models[i]->GetExpectedSampleRate();
-            bool ok = expected < 0 || models[i]->SupportsArbitrarySampleRate() || std::abs(expected - sr) < 1;
-            loaded[i] = ok;
-            if (ok)
-                models[i]->Reset(sr, maxBlock);
-            else
-                setStatus("NAM bypassed: match the device sample rate to the model, then reload.");
-        }
+    bool compatible = true;
+    for (auto &capture : captures) compatible = capture.prepare(sr, maxBlock) && compatible;
+    if (!compatible) setStatus("NAM bypassed: match the device sample rate to the model, then reload.");
+    gate.prepare(sr);
+    crossover.reset();
+    crossMix.prepare(sr, p("crossOn"));
+    muteGain.prepare(sr, p("tunerOn") && p("tunerMute") ? 0.f : 1.f);
+    tuner.prepare(sr);
     setLatencySamples(limiter.delaySamples);
 }
 void LowlineProcessor::set(const char *id, float v)
@@ -109,26 +126,93 @@ void LowlineProcessor::set(const char *id, float v)
     if (auto *x = state.getParameter(id))
         x->setValueNotifyingHost(x->convertTo0to1(v));
 }
+void LowlineProcessor::resetMidiMappings()
+{
+    for (auto &mapping : midiMap) mapping = -1;
+    const char *ids[] = {"compOn", "driveOn", "pedalOn", "ampOn", "cabOn", "delayOn", "reverbOn", "bypass"};
+    for (size_t i = 0; i < midiTargets.size(); ++i)
+    {
+        for (int cc = 0; cc < 8; ++cc)
+            if (midiTargets[i]->paramID == ids[cc]) midiMap[size_t(20 + cc)] = int(i);
+        if (midiTargets[i]->paramID == "blend") midiMap[11] = int(i);
+    }
+    midiMap[7] = -2; // Preserve the original CC7 range (-36 to +6 dB).
+    learnTarget = -1;
+}
+void LowlineProcessor::clearMidiTarget(int target)
+{
+    for (auto &mapping : midiMap)
+        if (mapping.load() == target || (mapping.load() == -2 && target >= 0 && target < int(midiTargets.size()) && midiTargets[size_t(target)]->paramID == "output")) mapping = -1;
+    learnTarget = -1;
+}
+StringArray LowlineProcessor::midiTargetNames() const
+{
+    StringArray names;
+    for (auto *parameter : midiTargets) names.add(parameter->getName(80));
+    names.add("Tap tempo");
+    return names;
+}
+String LowlineProcessor::midiDescription() const
+{
+    String result;
+    auto names = midiTargetNames();
+    for (int cc = 0; cc < 128; ++cc)
+    {
+        const int target = midiMap[size_t(cc)];
+        if (target == -2) result += "CC 7  -> Output (-36 / +6 dB)\n";
+        else if (target >= 0 && target < names.size())
+            result += "CC " + String(cc) + "  -> " + names[target] + "\n";
+    }
+    return result;
+}
+void LowlineProcessor::tapTempo()
+{
+    const double now = Time::getMillisecondCounterHiRes();
+    const double interval = now - lastTap.exchange(now);
+    if (interval >= 250 && interval <= 2000) set("tempo", float(60000 / interval));
+}
+void LowlineProcessor::assignProgram(int pc, const File &file)
+{
+    if (pc < 0 || pc > 127) return;
+    std::lock_guard lock(metadataMutex);
+    programFiles[size_t(pc)] = file == File{} ? String() : file.getFullPathName();
+    programAssigned[size_t(pc)] = file != File{};
+}
+String LowlineProcessor::programAssignment(int pc) const
+{
+    std::lock_guard lock(metadataMutex);
+    return pc >= 0 && pc < 128 ? programFiles[size_t(pc)] : String();
+}
 void LowlineProcessor::midi(const MidiBuffer &m)
 {
     for (auto item : m)
     {
         auto msg = item.getMessage();
         if (msg.isProgramChange())
-            setCurrentProgram(msg.getProgramChangeNumber());
-        if (msg.isController())
         {
-            int cc = msg.getControllerNumber();
-            float v = float(msg.getControllerValue());
-            const char *ids[] = {"compOn", "driveOn", "pedalOn",  "ampOn",
-                                 "cabOn",  "delayOn", "reverbOn", "bypass"};
-            if (cc >= 20 && cc <= 27)
-                set(ids[cc - 20], v >= 64 ? 1.f : 0.f);
-            if (cc == 11)
-                set("blend", v * 100 / 127);
-            if (cc == 7)
-                set("output", -36 + v * 42 / 127);
+            const int pc = msg.getProgramChangeNumber();
+            if (programAssigned[size_t(pc)]) requestedProgram = pc;
+            else setCurrentProgram(pc);
         }
+        if (!msg.isController()) continue;
+        const int cc = msg.getControllerNumber(), value = msg.getControllerValue();
+        const int learning = learnTarget.exchange(-1);
+        if (learning >= 0 && learning <= int(midiTargets.size()))
+        {
+            for (auto &mapping : midiMap)
+                if (mapping.load() == learning || (mapping.load() == -2 && learning < int(midiTargets.size()) && midiTargets[size_t(learning)]->paramID == "output")) mapping = -1;
+            midiMap[size_t(cc)] = learning;
+        }
+        const int target = midiMap[size_t(cc)];
+        const bool high = value >= 64;
+        if (target == int(midiTargets.size()))
+        {
+            if (high && !ccHigh[size_t(cc)]) tapTempo();
+        }
+        else if (target == -2) set("output", -36 + float(value) * 42 / 127);
+        else if (target >= 0 && target < int(midiTargets.size()))
+            midiTargets[size_t(target)]->setValueNotifyingHost(float(value) / 127);
+        ccHigh[size_t(cc)] = high;
     }
 }
 void LowlineProcessor::processBlock(AudioBuffer<float> &buffer, MidiBuffer &m)
@@ -140,27 +224,22 @@ void LowlineProcessor::processBlock(AudioBuffer<float> &buffer, MidiBuffer &m)
     for (int c = 0; c < getTotalNumInputChannels(); ++c)
         peak = std::max(peak, buffer.getMagnitude(c, 0, buffer.getNumSamples()));
     inputPeak = peak;
-    // Never wait for a file loader on the audio thread. Its commit only swaps prepared objects.
-    const SpinLock::ScopedTryLockType guard(modelLock);
-    if (!guard.isLocked())
-    {
-        const float gain = lowline::db(p("input") + p("output"));
-        const int src = int(p("source")), inputs = getTotalNumInputChannels();
-        for (int i = 0; i < buffer.getNumSamples(); ++i)
-        {
-            float x = buffer.getSample(src == 1 && inputs > 1 ? 1 : 0, i);
-            if (src == 2 && inputs > 1)
-                x = .5f * (buffer.getSample(0, i) + buffer.getSample(1, i));
-            x = std::isfinite(x) ? x * gain : 0;
-            for (int c = 0; c < getTotalNumOutputChannels(); ++c)
-                buffer.setSample(c, i, x);
-        }
-        limitOutput(buffer);
-        return;
-    }
+    const double started = Time::getMillisecondCounterHiRes();
+    float bpm = p("tempo");
+    bool host = false;
+    if (p("sync") && p("hostSync"))
+        if (auto *playhead = getPlayHead())
+            if (auto position = playhead->getPosition())
+                if (auto tempo = position->getBpm(); tempo && std::isfinite(*tempo) && *tempo >= 30 && *tempo <= 300)
+                { bpm = float(*tempo); host = true; }
+    effectiveTempo = bpm;
+    usingHostTempo = host;
+    effectiveDelay = p("sync") ? lowline::tempoDelay(bpm, int(p("division"))) : p("time");
     for (int off = 0; off < buffer.getNumSamples(); off += maxBlock)
         processChunk(buffer, off, std::min(maxBlock.load(), buffer.getNumSamples() - off));
     limitOutput(buffer);
+    const double budget = 1000.0 * buffer.getNumSamples() / rate.load();
+    if (budget > 0) cpuLoad = .9f * cpuLoad.load() + .1f * float((Time::getMillisecondCounterHiRes() - started) / budget * 100);
 }
 void LowlineProcessor::processBlockBypassed(AudioBuffer<float> &buffer, MidiBuffer &messages)
 {
@@ -180,6 +259,8 @@ void LowlineProcessor::limitOutput(AudioBuffer<float> &buffer)
     {
         float l = buffer.getSample(0, i), r = getTotalNumOutputChannels() > 1 ? buffer.getSample(1, i) : l;
         limiter.tick(l, r);
+        const float mute = muteGain.next(p("tunerOn") && p("tunerMute") ? 0.f : 1.f);
+        l *= mute; r *= mute;
         if (limiter.gain < .999f)
             clipped = true;
         buffer.setSample(0, i, lowline::safety(l));
@@ -202,7 +283,9 @@ void LowlineProcessor::processChunk(AudioBuffer<float> &out, int off, int n)
             x = .5f * (out.getSample(0, off + i) + out.getSample(1, off + i));
         if (!std::isfinite(x))
             x = 0;
+        if (p("tunerOn")) tuner.push(x);
         x *= inputGain.next(inTarget);
+        x = gate.tick(x, p("gateOn") && !bypass, p("gateThreshold"), p("gateRelease"));
         if (p("compOn") > .5f && !bypass)
             x = compressor.tick(x, p("threshold"), p("ratio"), p("attack"), p("release"), p("makeup"));
         dry.setSample(0, i, x);
@@ -217,17 +300,15 @@ void LowlineProcessor::processChunk(AudioBuffer<float> &out, int off, int n)
                 float g = drive.next(lowline::db(p("drive")));
                 work.setSample(0, i, std::tanh(work.getSample(0, i) * g));
             }
-        for (int s = 0; s < 2; ++s)
-            if (loaded[s] && p(s == 0 ? "pedalOn" : "ampOn") > .5f && models[s])
-            {
-                float *in[] = {work.getWritePointer(0)};
-                float *dst[] = {work.getWritePointer(1)};
-                models[s]->process(in, dst, n);
-                work.copyFrom(0, 0, work, 1, 0, n);
-            }
+        work.copyFrom(1, 0, work, 0, 0, n);
+        for (int stage = 0; stage < 2; ++stage)
+            captures[size_t(stage)].process(work, n, p(stage == 0 ? "pedalOn" : "ampOn") > .5f,
+                                           p("normOn") > .5f, p("normTarget"));
         eq[0].peak(rate, 100, p("bass"));
-        eq[1].peak(rate, 700, p("mid"));
-        eq[2].peak(rate, 3500, p("treble"));
+        eq[1].peak(rate, p("lowMidFreq"), p("lowMid"));
+        eq[2].peak(rate, p("midFreq"), p("mid"));
+        eq[3].peak(rate, p("highMidFreq"), p("highMid"));
+        eq[4].peak(rate, 3500, p("treble"));
         for (int i = 0; i < n; ++i)
         {
             float x = work.getSample(0, i);
@@ -239,16 +320,15 @@ void LowlineProcessor::processChunk(AudioBuffer<float> &out, int off, int n)
         }
     }
     work.copyFrom(1, 0, work, 0, 0, n);
-    auto block = dsp::AudioBlock<float>(work).getSubBlock(0, (size_t)n);
-    if (!bypass && loaded[Cab] && p("cabOn") > .5f && cab)
-    {
-        dsp::ProcessContextReplacing<float> c(block);
-        cab->process(c);
-    }
+    captures[Cab].process(work, n, !bypass && p("cabOn") > .5f, false, 0);
     const float polarity = p("invert") > .5f ? -1.f : 1.f;
     for (int i = 0; i < n; ++i)
     {
-        float d = dryDelay.tick(dry.getSample(0, i), p("align") * .001f * float(rate.load())) * polarity;
+        const float original = dry.getSample(0, i);
+        const float low = crossover.low(original, rate, p("crossFreq"));
+        const float amount = crossMix.next(p("crossOn"));
+        const float clean = (1 - amount) * original + amount * low;
+        float d = dryDelay.tick(clean, p("align") * .001f * float(rate.load())) * polarity;
         float wet = blend.next(p("blend") * .01f);
         for (int ch = 0; ch < 2; ++ch)
             work.setSample(ch, i, bypass ? dry.getSample(0, i) : (1 - wet) * d + wet * work.getSample(ch, i));
@@ -257,18 +337,14 @@ void LowlineProcessor::processChunk(AudioBuffer<float> &out, int off, int n)
     {
         float l = work.getSample(0, i), r = work.getSample(1, i);
         float mix = delayMix.next(!bypass && p("delayOn") > .5f ? p("delayMix") * .01f : 0);
-        delay.tick(l, r, p("time"), p("feedback") * .01f, mix, p("ping") > .5f, p("highcut"),
-                   !bypass && p("delayOn") > .5f ? 1.f : 0.f);
+        delay.tick(l, r, effectiveDelay.load(), p("feedback") * .01f, mix, p("ping") > .5f, p("highcut"),
+                   !bypass && p("delayOn") > .5f ? 1.f : 0.f, p("lowcut"));
         work.setSample(0, i, l);
         work.setSample(1, i, r);
     }
     dry.copyFrom(0, 0, work, 0, 0, n);
     dry.copyFrom(1, 0, work, 1, 0, n);
-    if (loaded[Room] && room)
-    {
-        dsp::ProcessContextReplacing<float> c(block);
-        room->process(c);
-    }
+    captures[Room].process(work, n, true, false, 0);
     for (int i = 0; i < n; ++i)
     {
         float rm = reverbMix.next(!bypass && loaded[Room] && p("reverbOn") > .5f ? p("reverbMix") * .01f : 0);
@@ -324,9 +400,21 @@ void LowlineProcessor::workerLoop()
         Job job;
         {
             std::unique_lock g(jobsMutex);
-            jobsReady.wait(g, [this] { return stopping || !jobs.empty(); });
+            jobsReady.wait_for(g, std::chrono::milliseconds(30), [this] { return stopping || !jobs.empty(); });
             if (stopping)
                 return;
+            if (jobs.empty())
+            {
+                g.unlock();
+                for (auto &capture : captures) capture.collect();
+                const int pc = requestedProgram.exchange(-1);
+                if (pc >= 0)
+                {
+                    const String path = programAssignment(pc);
+                    if (path.isNotEmpty()) openPreset(File(path), true);
+                }
+                continue;
+            }
             job = jobs.front();
             jobs.pop_front();
         }
@@ -352,73 +440,56 @@ void LowlineProcessor::workerLoop()
 }
 void LowlineProcessor::performLoad(Slot slot, const File &file)
 {
-    if (file == File{})
+    auto capture = std::make_unique<LowlineCapture>();
+    const double sr = rate.load();
+    const int bs = maxBlock.load();
+    if (file != File{})
     {
-        // Retire objects on this worker, never destroy a neural model on the audio callback.
-        std::unique_ptr<nam::DSP> oldModel;
-        std::unique_ptr<dsp::Convolution> oldIR;
+        if (!file.existsAsFile()) throw std::runtime_error("File not found: " + file.getFileName().toStdString());
+        if (slot < Cab)
         {
-            const SpinLock::ScopedLockType guard(modelLock);
-            loaded[slot] = false;
-            if (slot < Cab)
-                oldModel.swap(models[slot]);
-            else
-                oldIR.swap(slot == Cab ? cab : room);
-            std::lock_guard g(metadataMutex);
-            paths[slot].clear();
-            message = "Slot cleared / Rimosso";
+            capture->model = nam::get_dsp(std::filesystem::u8path(file.getFullPathName().toStdString()));
+            if (capture->model->NumInputChannels() != 1 || capture->model->NumOutputChannels() != 1)
+                throw std::runtime_error("Use a mono NAM model.");
+            const double expected = capture->model->GetExpectedSampleRate();
+            if (expected > 0 && !capture->model->SupportsArbitrarySampleRate() && std::abs(expected - sr) > 1)
+                throw std::runtime_error("Set device/DAW sample rate to " + String(expected, 0).toStdString() + " Hz, then reload.");
+            capture->hasLoudness = capture->model->HasLoudness();
+            if (capture->hasLoudness)
+            {
+                capture->loudness = float(capture->model->GetLoudness());
+                capture->hasLoudness = std::isfinite(capture->loudness);
+            }
         }
-        return;
-    }
-    if (!file.existsAsFile())
-        throw std::runtime_error("File not found: " + file.getFileName().toStdString());
-    double sr = rate;
-    int bs = maxBlock;
-    if (slot == Pedal || slot == Amp)
-    {
-        auto model = nam::get_dsp(std::filesystem::u8path(file.getFullPathName().toStdString()));
-        if (model->NumInputChannels() != 1 || model->NumOutputChannels() != 1)
-            throw std::runtime_error("This version accepts mono NAM models only.");
-        double expected = model->GetExpectedSampleRate();
-        if (expected > 0 && !model->SupportsArbitrarySampleRate() && std::abs(expected - sr) > 1)
-            throw std::runtime_error("Set audio device/DAW to " + String(expected, 0).toStdString() +
-                                     " Hz for this NAM model.");
-        model->Reset(sr, bs);
+        else
         {
-            const SpinLock::ScopedLockType guard(modelLock);
-            if (rate != sr || maxBlock != bs)
-                throw std::runtime_error("Audio setup changed; please reload the model.");
-            models[slot].swap(model);
-            loaded[slot] = true;
+            AudioFormatManager formats; formats.registerBasicFormats();
+            std::unique_ptr<AudioFormatReader> reader(formats.createReaderFor(file));
+            if (!reader || reader->lengthInSamples <= 0 || reader->numChannels > 2)
+                throw std::runtime_error("Use a mono/stereo WAV or AIFF impulse response.");
+            if (double(reader->lengthInSamples) / reader->sampleRate > (slot == Cab ? 2.0 : 20.0))
+                throw std::runtime_error("IR too long (cab 2 s / room 20 s maximum).");
+            capture->ir = std::make_unique<dsp::Convolution>();
+            capture->ir->loadImpulseResponse(file, dsp::Convolution::Stereo::yes, dsp::Convolution::Trim::no, 0,
+                                             dsp::Convolution::Normalise::yes);
         }
     }
-    else
+    capture->prepare(sr, bs);
     {
-        AudioFormatManager formats;
-        formats.registerBasicFormats();
-        std::unique_ptr<AudioFormatReader> reader(formats.createReaderFor(file));
-        if (!reader || reader->lengthInSamples <= 0 || reader->numChannels > 2)
-            throw std::runtime_error("Use a mono/stereo WAV or AIFF impulse response.");
-        double seconds = double(reader->lengthInSamples) / reader->sampleRate;
-        if (seconds > (slot == Cab ? 2.0 : 20.0))
-            throw std::runtime_error(slot == Cab ? "Cab IR maximum: 2 seconds."
-                                                 : "Reverb IR maximum: 20 seconds.");
-        auto conv = std::make_unique<dsp::Convolution>();
-        conv->loadImpulseResponse(file, dsp::Convolution::Stereo::yes, dsp::Convolution::Trim::no, 0,
-                                  dsp::Convolution::Normalise::yes);
-        conv->prepare({sr, (uint32)bs, 2});
+        const SpinLock::ScopedLockType guard(modelLock);
+        if (rate != sr || maxBlock != bs) throw std::runtime_error("Audio setup changed; reload the file.");
+        if (slot < Cab)
         {
-            const SpinLock::ScopedLockType guard(modelLock);
-            if (rate != sr || maxBlock != bs)
-                throw std::runtime_error("Audio setup changed; please reload the IR.");
-            (slot == Cab ? cab : room).swap(conv);
-            loaded[slot] = true;
+            normalisationAvailable[size_t(slot)] = capture->hasLoudness;
+            modelLoudness[size_t(slot)] = capture->loudness;
         }
+        captures[size_t(slot)].publish(std::move(capture));
+        loaded[size_t(slot)] = file != File{};
     }
     {
         std::lock_guard g(metadataMutex);
-        paths[slot] = file.getFullPathName();
-        message = "Loaded / Caricato: " + file.getFileName();
+        paths[slot] = file == File{} ? String() : file.getFullPathName();
+        message = file == File{} ? "Slot cleared / Rimosso" : "Loaded / Caricato: " + file.getFileName();
     }
 }
 const String LowlineProcessor::getProgramName(int i)
@@ -432,6 +503,11 @@ void LowlineProcessor::setCurrentProgram(int i)
         return;
     program = i;
     // Deterministic sound settings; preserve interface selection and input/output calibration.
+    set("gateOn", 0); set("gateThreshold", -55); set("gateRelease", 150);
+    set("lowMid", 0); set("highMid", 0);
+    set("lowMidFreq", 250); set("midFreq", 700); set("highMidFreq", 1500);
+    set("crossOn", 0); set("crossFreq", 180);
+    set("sync", 0); set("lowcut", 0); set("normOn", 0);
     set("attack", 15);
     set("release", 120);
     set("invert", 0);
@@ -467,6 +543,19 @@ void LowlineProcessor::getStateInformation(MemoryBlock &dest)
         for (int i = 0; i < 4; ++i)
             tree.setProperty("file" + String(i), paths[i], nullptr);
     }
+    ValueTree mappings("MidiMappings");
+    for (int cc = 0; cc < 128; ++cc) mappings.setProperty("cc" + String(cc), midiMap[size_t(cc)].load(), nullptr);
+    tree.removeChild(tree.getChildWithName("MidiMappings"), nullptr);
+    tree.addChild(mappings, -1, nullptr);
+    ValueTree bank("ProgramFiles");
+    {
+        std::lock_guard guard(metadataMutex);
+        for (int pc = 0; pc < 128; ++pc)
+            if (programFiles[size_t(pc)].isNotEmpty()) bank.setProperty("pc" + String(pc), programFiles[size_t(pc)], nullptr);
+    }
+    tree.removeChild(tree.getChildWithName("ProgramFiles"), nullptr);
+    tree.addChild(bank, -1, nullptr);
+    tree.setProperty("schema", 2, nullptr);
     tree.setProperty("language", getLanguage(), nullptr);
     tree.setProperty("program", program.load(), nullptr);
     auto xml = tree.createXml();
@@ -478,7 +567,33 @@ void LowlineProcessor::setStateInformation(const void *data, int size)
     if (!xml || !xml->hasTagName("Lowline"))
         return;
     auto tree = ValueTree::fromXml(*xml);
+    // Old presets receive defaults for newly introduced parameters.
+    for (auto *parameter : midiTargets)
+        if (!tree.getChildWithProperty("id", parameter->paramID).isValid())
+        {
+            ValueTree child("PARAM"); child.setProperty("id", parameter->paramID, nullptr);
+            child.setProperty("value", parameter->convertFrom0to1(parameter->getDefaultValue()), nullptr);
+            tree.addChild(child, -1, nullptr);
+        }
     state.replaceState(tree);
+    resetMidiMappings();
+    auto mappings = tree.getChildWithName("MidiMappings");
+    if (mappings.isValid())
+        for (int cc = 0; cc < 128; ++cc)
+        {
+            const int target = int(mappings.getProperty("cc" + String(cc), -1));
+            midiMap[size_t(cc)] = target >= -2 && target <= int(midiTargets.size()) ? target : -1;
+        }
+    auto bank = tree.getChildWithName("ProgramFiles");
+    if (bank.isValid())
+    {
+        std::lock_guard guard(metadataMutex);
+        for (int pc = 0; pc < 128; ++pc)
+        {
+            programFiles[size_t(pc)] = bank.getProperty("pc" + String(pc)).toString();
+            programAssigned[size_t(pc)] = programFiles[size_t(pc)].isNotEmpty();
+        }
+    }
     setLanguage(tree.getProperty("language", "IT").toString());
     program = jlimit(0, 3, int(tree.getProperty("program", 0)));
     {
@@ -494,7 +609,7 @@ void LowlineProcessor::setStateInformation(const void *data, int size)
     }
     jobsReady.notify_one();
 }
-void LowlineProcessor::savePreset(const File &f)
+void LowlineProcessor::savePreset(const File &f, bool portable)
 {
     if (busy)
     {
@@ -503,15 +618,36 @@ void LowlineProcessor::savePreset(const File &f)
     }
     MemoryBlock b;
     getStateInformation(b);
-    if (!f.replaceWithData(b.getData(), b.getSize()))
+    if (portable)
+    {
+        auto xml = getXmlFromBinary(b.getData(), int(b.getSize()));
+        auto tree = ValueTree::fromXml(*xml);
+        int64 total = 0;
+        for (int slot = 0; slot < 4; ++slot)
+        {
+            const String path = tree.getProperty("file" + String(slot)).toString();
+            if (path.isEmpty()) continue;
+            File asset(path);
+            const auto size = asset.getSize(); total += size;
+            if (!asset.existsAsFile() || size <= 0 || size > 64 * 1024 * 1024 || total > 192 * 1024 * 1024)
+            { setStatus("Portable save failed: missing or oversized asset (64 MB/file, 192 MB total)."); return; }
+            MemoryBlock bytes;
+            if (!asset.loadFileAsData(bytes)) { setStatus("Cannot read asset for portable preset."); return; }
+            tree.setProperty("asset" + String(slot), bytes.toBase64Encoding(), nullptr);
+            tree.setProperty("ext" + String(slot), asset.getFileExtension(), nullptr);
+        }
+        auto portableXml = tree.createXml(); b.reset(); copyXmlToBinary(*portableXml, b);
+    }
+    TemporaryFile temporary(f);
+    if (!temporary.getFile().replaceWithData(b.getData(), b.getSize()) || !temporary.overwriteTargetFileWithTemporary())
         setStatus("Cannot save preset");
     else
         setStatus("Preset saved / Salvato");
 }
-void LowlineProcessor::openPreset(const File &f)
+void LowlineProcessor::openPreset(const File &f, bool preserveMidi)
 {
     MemoryBlock b;
-    if (!f.loadFileAsData(b))
+    if (f.getSize() > 300LL * 1024 * 1024 || !f.loadFileAsData(b))
     {
         setStatus("Cannot read preset");
         return;
@@ -522,6 +658,45 @@ void LowlineProcessor::openPreset(const File &f)
         setStatus("Invalid Lowline preset");
         return;
     }
+    auto tree = ValueTree::fromXml(*xml);
+    int64 total = 0;
+    for (int slot = 0; slot < 4; ++slot)
+    {
+        const String encoded = tree.getProperty("asset" + String(slot)).toString();
+        if (encoded.isEmpty()) continue;
+        MemoryBlock bytes;
+        if (!bytes.fromBase64Encoding(encoded) || bytes.getSize() > 64 * 1024 * 1024)
+        { setStatus("Invalid portable asset."); return; }
+        total += int64(bytes.getSize());
+        const String ext = tree.getProperty("ext" + String(slot)).toString().toLowerCase();
+        if (total > 192LL * 1024 * 1024 || (slot < 2 ? ext != ".nam" : !StringArray{".wav", ".aif", ".aiff"}.contains(ext)))
+        { setStatus("Invalid portable asset type or size."); return; }
+        auto cache = File::getSpecialLocation(File::userApplicationDataDirectory).getChildFile("Lowline/Assets");
+        if (cache.createDirectory().failed()) { setStatus("Cannot create asset cache."); return; }
+        auto asset = cache.getChildFile(SHA256(bytes).toHexString() + ext);
+        if (!asset.existsAsFile() || SHA256(asset).toHexString() != SHA256(bytes).toHexString())
+        {
+            TemporaryFile temporary(asset);
+            if (!temporary.getFile().replaceWithData(bytes.getData(), bytes.getSize()) ||
+                !temporary.overwriteTargetFileWithTemporary())
+            { setStatus("Cannot extract portable asset."); return; }
+        }
+        tree.setProperty("file" + String(slot), asset.getFullPathName(), nullptr);
+        tree.removeProperty("asset" + String(slot), nullptr);
+        tree.removeProperty("ext" + String(slot), nullptr);
+    }
+    if (preserveMidi)
+    {
+        MemoryBlock current; getStateInformation(current);
+        auto currentXml = getXmlFromBinary(current.getData(), int(current.getSize()));
+        auto currentTree = ValueTree::fromXml(*currentXml);
+        for (const auto *name : {"MidiMappings", "ProgramFiles"})
+        {
+            tree.removeChild(tree.getChildWithName(name), nullptr);
+            tree.addChild(currentTree.getChildWithName(name).createCopy(), -1, nullptr);
+        }
+    }
+    auto extracted = tree.createXml(); b.reset(); copyXmlToBinary(*extracted, b);
     setStateInformation(b.getData(), (int)b.getSize());
     // Loader errors must remain visible instead of being overwritten by a success message.
 }

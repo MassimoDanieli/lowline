@@ -36,7 +36,8 @@ class LowlineEditor : public juce::AudioProcessorEditor,
     };
     void timerCallback() override;
     void choose(LowlineProcessor::Slot);
-    void preset(bool save);
+    void preset(bool save, bool portable = false);
+    void assignMidiPreset();
     void translate();
     void panel(juce::Graphics &, juce::Rectangle<int>, const juce::String &, juce::Colour);
     void placeKnob(const char *, juce::Rectangle<int>);
@@ -48,7 +49,15 @@ class LowlineEditor : public juce::AudioProcessorEditor,
     std::map<juce::String, std::unique_ptr<Toggle>> toggles;
     std::array<juce::TextButton, 4> loadButtons, clearButtons;
     juce::TextButton saveButton{"SAVE"}, openButton{"OPEN"}, toneButton{"TONE3000 "},
-        languageButton{"IT / EN"}, helpButton{"GUIDA"};
+        languageButton{"IT / EN"}, helpButton{"GUIDA"}, packButton{"PACK"},
+        rigTab{"RIG"}, toolsTab{"TOOLS"}, midiTab{"MIDI"}, tapButton{"TAP"},
+        learnButton{"LEARN"}, cancelLearn{"CANCEL"}, clearMapping{"CLEAR"}, resetMapping{"RESET"},
+        assignButton{"ASSIGN PRESET"}, unassignButton{"CLEAR PC"};
+    int page = 0;
+    juce::ComboBox division, midiTarget, midiProgram;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> divisionLink;
+    juce::Label tunerLabel, syncLabel, normLabel, midiHint, assignmentLabel;
+    juce::TextEditor mappingText;
     juce::ComboBox source, programs;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> sourceLink;
     juce::Label statusLabel, subtitle, meterLabel;

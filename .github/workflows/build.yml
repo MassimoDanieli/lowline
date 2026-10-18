@@ -55,6 +55,8 @@ jobs:
           path: |
             lowline-preview.png
             lowline-help-preview.png
+            lowline-tools-preview.png
+            lowline-midi-preview.png
       - name: Verify Mac architectures and package
         if: runner.os == 'macOS'
         run: |

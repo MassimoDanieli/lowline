@@ -1,3 +1,12 @@
+# Lowline 0.2.0
+
+- Added tuner with mute and A4 calibration, gate, five-band EQ and clean low-pass.
+- Added NAM loudness-metadata normalisation, tempo-sync delay, tap tempo, low cut and audio CPU timing.
+- Added persistent MIDI learn, user preset Program Change assignments and portable preset export.
+- Replaced capture swaps with prepared-engine mailboxes and 50 ms crossfades; retired engines are deleted off the audio thread.
+- Added TOOLS and MIDI pages; updated both offline guides and the Italian announcement.
+- Older presets retain parameter IDs and receive neutral defaults for added controls.
+
 # Lowline 0.1.1
 
 Correctness and stability update; not feature parity with Profondo.

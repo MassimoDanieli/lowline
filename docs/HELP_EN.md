@@ -1,7 +1,7 @@
-# Lowline — User guide
+# Lowline 0.2 — User guide
 
 ## 01 · Start here
-Lowline is a bass rig combining a compressor, booster, two NAM models, cabinet impulse response (IR), EQ, parallel clean signal, stereo delay and IR reverb. It runs as a standalone app or VST3 plugin; AU is also available on Mac.
+Lowline is a bass rig combining a gate, compressor, booster, two NAM models, cabinet impulse response (IR), EQ, parallel clean signal, stereo delay and IR reverb. It runs as a standalone app or VST3 plugin; AU is also available on Mac.
 
 For your first session:
 1. Connect your bass to the Scarlett, enable INST on that input and turn down your headphone volume.
@@ -14,26 +14,28 @@ For your first session:
 
 Green means a button is active; a dark button is off. The word “ON” is a fixed label: use the colour to identify the state. An active button does not mean a file has been loaded into that slot.
 
-Open HELP from the main screen. Choose a topic from the index; IT / EN changes this guide's language. The guide is built into the app and works offline.
+The RIG, TOOLS and MIDI tabs separate the signal chain, sound tools and controller setup. TOOLS contains the tuner, gate, EQ, clean filter, normalisation and delay timing.
+
+Open HELP from the main screen. Choose a topic from the index; ENGLISH / ITALIANO changes this guide's language. The guide is built into the app and works offline.
 
 ## 02 · Signal flow and interface
 The signal path is:
-Selected input → INPUT → compressor → split into two branches.
+Selected input → INPUT → gate → compressor → split into two branches.
 
 Processed branch: BOOST → NAM pedal → NAM amp → EQ → cabinet IR.
-Clean branch: CLEAN ALIGN → CLEAN PHASE.
+Clean branch: optional CLEAN LP filter → CLEAN ALIGN → CLEAN PHASE.
 
 AMP / CLEAN combines the branches; next come stereo delay → IR reverb → OUTPUT → final limiter.
 
-The clean branch starts AFTER the compressor. “Clean” means without booster, NAM, EQ or cabinet, but it can still be compressed. Delay and reverb process the combined signal.
+The clean branch starts AFTER the gate and compressor. “Clean” means without booster, NAM, EQ or cabinet, but it can still be compressed. Delay and reverb process the combined signal.
 
 Input 1 / Left uses the first channel; Input 2 / Right uses the second when available. Stereo > Mono averages the two inputs: it does not preserve a stereo source. The rig starts with a mono instrument; stereo effects and IRs can create width at the output.
 
 Drag a knob to change it; double-click to restore the parameter's default value. You can also edit the number below a knob and press Enter.
 
-SAVE and OPEN manage .lowline presets. The upper-right menu offers four factory starting configurations. IT / EN on the main screen changes the interface language; technical control names remain in English.
+SAVE and OPEN manage .lowline presets. EXPORT creates a portable preset containing the loaded models and IRs. The upper-right menu offers four factory starting configurations. IT / EN on the main screen changes the interface language; technical control names remain in English.
 
-## 03 · Input, output and meters
+## 03 · Levels, CPU and tuner
 INPUT: −36 to +24 dB. Adjusts the signal before the compressor and models. Increasing it can drive a NAM capture harder; it does more than increase final loudness.
 
 OUTPUT: −36 to +12 dB. Adjusts level after the effects and before the limiter. Start at −6 dB and compare sounds at similar loudness.
@@ -46,7 +48,17 @@ LIMIT means the output limiter is reducing level. Lower OUTPUT, MAKEUP or upstre
 
 BYPASS skips the rig chain while retaining input selection, INPUT, OUTPUT and final protection. It does not automatically match comparison levels. The host's plugin bypass preserves the declared latency.
 
-## 04 · Compressor: a more even bass sound
+CPU shows smoothed audio-callback processing time as a percentage of the time available for each block. It is not total system CPU usage: spikes near or above 100% can cause drop-outs. Capture changes temporarily process two engines.
+
+TUNER (TOOLS tab): enable TUNER and play one string at a time. It displays note, octave, frequency and cents deviation; ±3 cents is highlighted green. A4 REFERENCE adjusts concert pitch from 430 to 450 Hz (default 440). Fundamental detection covers 25–500 Hz, including a five-string bass's low B. Detection is monophonic: strong harmonics, noise and chords may confuse it. Allow a fraction of a second for the note to settle.
+
+MUTE gradually silences the output only while TUNER is enabled. Switching TUNER off restores sound even if MUTE remains selected. The tuner reads the input before the gate and effects; pitch analysis runs on a separate thread.
+
+## 04 · Gate and compressor: a more even bass sound
+GATE ON in TOOLS attenuates background noise during pauses, before the compressor. GATE THRESHOLD (−80…−10 dB) sets the opening threshold; GATE RELEASE (20…1000 ms) controls gradual closure. Opening takes approximately 2 ms, with a 40 ms hold and 3 dB hysteresis to avoid chatter near the threshold.
+
+Start at −55 dB and 150 ms. Stop playing and raise the threshold gradually until noise is reduced; then check that quiet notes and sustain are preserved. The gate defaults to off for compatibility with older presets.
+
 COMP ON enables the compressor before the clean/processed split.
 
 THRESHOLD (−60…0 dB): the level above which compression increases. Lower it to compress more notes.
@@ -70,12 +82,18 @@ CAB accepts a mono or stereo cabinet IR in WAV or AIFF format, up to 2 seconds l
 
 A capture may already include a cabinet and microphone. In that case try CAB off to avoid filtering the sound twice. Check the capture author's description.
 
-Models must be mono-in/mono-out .nam files. The core supports A2, but compatibility and CPU demand depend on the capture. If the required sample rate differs from the device rate, follow the status message, change the rate and reload the model. Lowline does not automatically normalise capture loudness.
+Models must be mono-in/mono-out .nam files. The core supports A2, but compatibility and CPU demand depend on the capture. If the required sample rate differs from the device rate, follow the status message, change the rate and reload the model. NORMALISE in TOOLS enables level compensation based on the NAM model's loudness metadata. NAM TARGET sets the reference from −30 to −6 dB; correction is limited to ±18 dB per model and applied gradually. The default target is −18 dB.
+
+PEDAL and AMP display the declared loudness; “no metadata” means the slot is empty or lacks a valid value. In that case model gain stays unchanged: Lowline does not invent a measurement or automatically analyse perceived loudness. PEDAL compensation also changes the signal entering AMP and can affect its distortion. Physical input calibration in dBu remains manual.
+
+NAM/IR changes use a 50 ms crossfade between the previous engine and the new engine, prepared outside the audio callback. Rapid requests retain the most recent pending engine. CPU demand temporarily increases; a crossfade cannot guarantee that every combination of captures, phase and CPU load is inaudible. Long IR tails are not retained beyond the transition.
 
 TONE3000 opens the website in your browser: download a file yourself, then load it into the correct slot. There is no integrated downloader. No models or IRs are included.
 
 ## 06 · EQ and parallel clean signal
-BASS / 100 Hz, MID / 700 Hz and TREBLE / 3.5 kHz control three bell filters from −12 to +12 dB. Their frequencies are fixed. EQ affects only the processed branch, before the cabinet IR.
+EQ lives in TOOLS. Five bell filters provide −12 to +12 dB gain: BASS (100 Hz), LOW MID (default 250 Hz), MID (default 700 Hz), HIGH MID (default 1500 Hz) and TREBLE (3500 Hz).
+
+LOW MID FREQ ranges from 80 to 800 Hz; MID FREQ from 150 to 2500 Hz; HIGH MID FREQ from 500 to 6000 Hz. Bands can overlap: make small changes and compare loudness. The two additional bands default to 0 dB, retaining older presets' original settings. EQ affects only the processed branch, before the cabinet IR.
 
 AMP / CLEAN is the percentage of the processed branch:
 • 0% = clean branch only.
@@ -86,7 +104,7 @@ AMP / CLEAN does not affect just the amp model: the processed branch includes bo
 
 CLEAN PHASE reverses the clean branch's polarity. If blending the branches makes the bass sound thin, compare both settings and keep the fuller one.
 
-CLEAN ALIGN delays the clean signal by 0–20 ms to compensate for timing offsets in captures or IRs. Start at 0, temporarily set blend near 50% and increase alignment in small steps while listening to low notes. This is manual alignment, not automatic measurement; do not use it to compensate for the entire interface latency. There is no crossover separating low frequencies from the rest of the clean signal.
+CLEAN ALIGN delays the clean signal by 0–20 ms to compensate for timing offsets in captures or IRs. Start at 0, temporarily set blend near 50% and increase alignment in small steps while listening to low notes. This is manual alignment, not automatic measurement; do not use it to compensate for the entire interface latency. CLEAN LP enables a 12 dB/octave low-pass on the clean branch only. CLEAN LOW PASS sets the cutoff from 50 to 1000 Hz (default 180). Use it to keep a clean low end while the processed branch supplies character and harmonics. The processed branch stays full-range: this is not a complementary frequency split. At 0% blend with CLEAN LP enabled you hear only filtered clean signal.
 
 ## 07 · Stereo delay
 DELAY ON makes repeats audible and sends new notes into the delay.
@@ -99,7 +117,11 @@ PING PONG: alternates repeats between left and right. Use headphones or stereo o
 
 Starting point: TIME 380 ms, FEEDBACK 27%, DELAY LEVEL 18%, HIGH CUT 3500 Hz.
 
-The delay does not automatically synchronise to DAW tempo and has no tap tempo. For a quarter note use TIME = 60000 / BPM; at 120 BPM this is 500 ms. Halve that for an eighth note; use 75% of the quarter-note value for a dotted eighth.
+SYNC in TOOLS calculates delay from TEMPO and a subdivision: 1/16, 1/8, dotted 1/8, 1/4, dotted 1/4 or 1/2. At 120 BPM a quarter note is 500 ms and a dotted eighth is 375 ms. TIME is ignored while SYNC is enabled; the effective delay appears below the selector.
+
+HOST BPM uses DAW tempo when supplied and within 30–300 BPM. Standalone or an unavailable/invalid host tempo falls back to TEMPO (30–240 BPM). The DAW/Manual label identifies the source. TAP derives tempo from two presses 250–2000 ms apart: press regularly at least twice. Disable HOST BPM to use taps when the host is providing a valid tempo. Tap tempo is also available through MIDI learn.
+
+DELAY LOW CUT (0…1000 Hz) reduces low frequencies in the repeats and feedback; 0 disables it. Try 100–200 Hz if repeats muddy the bass. HIGH CUT remains in RIG. Synchronised delay can exceed the manual TIME control's 1500 ms maximum.
 
 Switching delay off stops new notes entering it and fades its output. It is not a guaranteed tail-preserving preset system: previous delay memory may remain if you turn it back on quickly.
 
@@ -113,11 +135,15 @@ Enabling REVERB ON without a loaded IR does not create a reverb. The file determ
 IR normalisation is handled by the convolution engine; this does not automatically match NAM model loudness. The IR's initial timing is preserved. Longer IRs may use more resources: try a shorter IR or a larger buffer if playback breaks up.
 
 ## 09 · Presets, files and drag-and-drop
-SAVE creates a .lowline preset; OPEN recalls one. Presets and DAW sessions store controls, language and absolute NAM/IR file paths. They do not embed models or IRs.
+SAVE creates a lightweight .lowline preset with controls, language, MIDI mappings, Program Change assignments and absolute NAM/IR file paths. DAW sessions retain the same state. OPEN reads both ordinary and portable presets.
 
-To preserve a sound, keep assets in a stable folder, save the preset and note which files it uses. To transfer it to another computer, copy the assets too, reload them through the slots on the new system and save the preset again. Relocation is not automatic.
+EXPORT creates a portable .lowline containing copies of the models and IRs loaded in all four slots. Limits are 64 MB per asset and 192 MB total; missing or oversized assets cancel export. Wait for Loading to finish before saving. Embed and share only assets you have permission to redistribute.
 
-The “x” clears a slot. Errors can indicate a missing file, incompatible format or wrong sample rate: read the status bar at the bottom. While Loading is displayed, wait for completion before judging the sound. Replacing captures can cause a discontinuity: do it between phrases.
+On opening, embedded assets are extracted to a persistent Lowline/Assets cache in your user application-data folder. Original paths are no longer required. Subsequent ordinary saves refer to the cache: use EXPORT again to move them to another computer. Paths to other presets assigned to Program Changes are not recursively embedded; transfer those presets separately and reassign them if needed.
+
+To preserve a sound, keep assets in a stable folder, save the preset and note which files it uses. To transfer an ordinary preset, copy and reload its assets too; alternatively use EXPORT to create a single portable file.
+
+The “x” clears a slot. Errors can indicate a missing file, incompatible format or wrong sample rate: read the status bar at the bottom. While Loading is displayed, wait for completion before judging the sound. Capture changes use a 50 ms crossfade. A complete preset applies controls and loads slots sequentially: it is not an atomic scene switch with every tail preserved.
 
 Drag-and-drop:
 • Dropping a .nam anywhere in the window loads AMP; use PEDAL's own button for a pedal capture.
@@ -129,7 +155,9 @@ The four factory configurations are starting points: Clean foundation, Warm edge
 ## 10 · MIDI and foot controllers
 In the standalone app enable your controller in Audio/MIDI settings. For the plugin, route MIDI to Lowline in your DAW; the procedure depends on the host. Lowline accepts all MIDI channels.
 
-Program Change 0…3 recalls the four factory presets in order. Some controllers display these as 1…4: check the actual transmitted message. It does not recall saved .lowline files; other program numbers are ignored.
+Program Change 0…3 recalls the four factory presets in order. Some controllers display these as 1…4: check the actual transmitted message. In MIDI you can assign a .lowline file to any PC 0…127: choose the number, click ASSIGN PRESET and select the file. CLEAR PC removes an assignment. User assignments override factory presets; unassigned numbers above 3 are ignored. Files load on the worker, including the time needed to read and prepare assets.
+
+SAVE retains the bank in the current preset/session. PC recalls preserve current bank assignments and MIDI learn, so a loaded preset does not erase your foot-controller setup. Manual OPEN restores the mappings saved in that file.
 
 Control Change (CC):
 20 = compressor
@@ -145,7 +173,11 @@ Control Change (CC):
 
 For CC 20…27, values 0…63 switch off and 64…127 switch on. Configure a latching switch that alternates 0 and 127. A momentary switch may enable an effect only while held, depending on its programming.
 
-An expression pedal transmitting CC 11 can control blend, but Lowline has no MIDI learn, remapping, pedal calibration or tap tempo. Messages are applied at audio-block boundaries rather than sample-accurately.
+MIDI LEARN: choose a parameter, click LEARN and move the controller. The next received CC is assigned to that parameter; its previous assignment is removed. CANCEL stops listening, CLEAR removes the selected parameter's assignment and RESET restores the initial map above. The list shows assigned CCs.
+
+Continuous controls use the parameter's full range across values 0…127, so learned OUTPUT reaches +12 dB while default CC 7 keeps its original +6 dB ceiling. Buttons use 0…63 off and 64…127 on. Tap tempo triggers on a transition from low to high: the controller must also transmit release.
+
+An expression pedal can control blend, output or other parameters. Calibrate its range on the controller: Lowline does not yet offer min/max calibration or custom curves. Assignments accept every channel; messages apply at audio-block boundaries rather than sample-accurately.
 
 ## 11 · Plugin use on Mac, Windows and Linux
 Standalone is the independent app. VST3 is the plugin format for a compatible host; AU is the Mac format used by hosts such as GarageBand and Logic. Install only the formats you need.
@@ -170,10 +202,12 @@ Doubled or hollow bass: disable direct monitoring and check that standalone and 
 
 Distortion: first check Scarlett input clipping; then reduce INPUT, BOOST, MAKEUP and OUTPUT as appropriate to the stage that distorts. A NAM model may intentionally distort. LIMIT indicates output limiting rather than physical input clipping.
 
-Crackles or excessive delay: increase buffer size to reduce interruptions; lower it for less latency if the computer can cope. Try lighter captures and shorter IRs. The limiter adds approximately 1 ms, on top of device, buffer and other plugin latency. Lowline has no CPU load display.
+Crackles or excessive delay: increase buffer size to reduce interruptions; lower it for less latency if the computer can cope. Try lighter captures and shorter IRs. The limiter adds approximately 1 ms, on top of device, buffer and other plugin latency. Check CPU as well: it measures audio processing time against the block budget.
 
-Changed preset sound or missing files: keep original paths or reload the assets and save again. No models are embedded in the preset.
+Changed preset sound or missing files: keep original paths or reload the assets and save again. SAVE retains paths; EXPORT embeds models and IRs.
 
 NAM fails to load: read the status bar, check mono model compatibility and the required sample rate. AMP ON alone does not load an amplifier.
 
-Not yet available: tuner, gate, model loudness normalisation, five-band EQ, clean crossover, delay sync, MIDI learn, presets with embedded assets and seamless capture changes. Use your host's tuner and tools when needed. Automated builds verify software, not real Scarlett latency or listening results.
+Current limits: NAM normalisation requires valid loudness metadata; input and expression-pedal calibration remain manual; no guarantee of atomic scene changes or complete tail preservation. The 50 ms crossfade avoids an abrupt engine swap but temporarily increases CPU demand. The tuner is monophonic. No models or IRs are supplied.
+
+Automated builds check software using synthetic signals and test models. Latency, drop-outs, accuracy on real basses and listening results need verification with your Scarlett and host. Start with a 256-sample buffer and low volume; try 128 if the system remains stable.

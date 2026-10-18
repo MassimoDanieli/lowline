@@ -25,6 +25,27 @@ void settle(LowlineProcessor &p, AudioBuffer<float> &b, float value = 0)
         p.processBlock(b, m);
     }
 }
+float toneRms(LowlineProcessor &processor, float hz)
+{
+    AudioBuffer<float> audio(2, 256);
+    MidiBuffer midi;
+    for (int block = 0; block < 120; ++block)
+    {
+        for (int i = 0; i < 256; ++i)
+            for (int ch = 0; ch < 2; ++ch)
+                audio.setSample(ch, i, .05f * std::sin(2 * lowline::pi * hz * (block * 256 + i) / 48000));
+        processor.processBlock(audio, midi);
+    }
+    return audio.getRMSLevel(0, 0, 256);
+}
+class TempoPlayHead : public AudioPlayHead
+{
+  public:
+    Optional<PositionInfo> getPosition() const override
+    {
+        PositionInfo position; position.setBpm(90.0); return position;
+    }
+};
 void wait(LowlineProcessor &p)
 {
     for (int i = 0; i < 1000 && p.busy; ++i)
@@ -94,6 +115,47 @@ int main(int argc, char **argv)
             silence = std::max(silence, std::abs(l) + std::abs(r));
         }
         require(silence == 0, "disabled delay does not secretly record new notes");
+        // Bass fundamentals, harmonics, DC rejection and cents accuracy.
+        std::array<float, 2048> pitchFrame{};
+        for (float hz : {30.8677f, 41.2034f, 55.f, 73.4162f, 98.f, 110.f, 440.f})
+        {
+            for (int i = 0; i < int(pitchFrame.size()); ++i)
+            {
+                const double phase = 2 * lowline::pi * hz * i / 6000;
+                pitchFrame[size_t(i)] = float(.2 * std::sin(phase) + .08 * std::sin(2 * phase) + .03 * std::sin(3 * phase));
+            }
+            const float detected = LowlineTuner::detect(pitchFrame.data(), int(pitchFrame.size()), 6000);
+            require(detected > 0 && std::abs(1200 * std::log2(detected / hz)) < 4,
+                    "tuner identifies bass fundamental with harmonics within four cents");
+        }
+        pitchFrame.fill(.2f);
+        require(LowlineTuner::detect(pitchFrame.data(), int(pitchFrame.size()), 6000) == 0, "tuner rejects DC");
+        pitchFrame.fill(0);
+        require(LowlineTuner::detect(pitchFrame.data(), int(pitchFrame.size()), 6000) == 0, "tuner rejects silence");
+        lowline::Gate gate;
+        gate.prepare(48000);
+        float gated = 0;
+        for (int i = 0; i < 96000; ++i) gated = gate.tick(.0001f, true, -55, 150);
+        require(std::abs(gated) < 1.e-8f, "gate suppresses quiet background noise");
+        for (int i = 0; i < 4800; ++i) gated = gate.tick(.1f, true, -55, 150);
+        require(std::abs(gated - .1f) < .001f, "gate opens for played notes");
+        require(std::abs(lowline::tempoDelay(120, 2) - 375) < .01f &&
+                std::abs(lowline::tempoDelay(60, 5) - 2000) < .01f,
+                "delay computes dotted and half-note subdivisions");
+        lowline::CleanCrossover cross;
+        double lowEnergy = 0, highEnergy = 0;
+        for (int i = 0; i < 48000; ++i)
+        {
+            const float y = cross.low(std::sin(2 * lowline::pi * 50 * i / 48000), 48000, 180);
+            if (i > 24000) lowEnergy += y * y;
+        }
+        cross.reset();
+        for (int i = 0; i < 48000; ++i)
+        {
+            const float y = cross.low(std::sin(2 * lowline::pi * 2000 * i / 48000), 48000, 180);
+            if (i > 24000) highEnergy += y * y;
+        }
+        require(lowEnergy > 9000 && highEnergy < lowEnergy * .001, "clean crossover retains bass and rejects high frequencies");
         LowlineProcessor p;
         p.prepareToPlay(48000, 256);
         require(p.getLatencySamples() == 48, "processor reports limiter latency to host");
@@ -206,6 +268,162 @@ int main(int argc, char **argv)
         p.openPreset(wrongPreset);
         require(p.state.getRawParameterValue("blend")->load() == 37 && p.status().contains("Invalid"),
                 "foreign XML preset is rejected without changing controls");
+        LowlineProcessor shaping;
+        shaping.prepareToPlay(48000, 256);
+        set(shaping, "compOn", 0); set(shaping, "blend", 100); set(shaping, "output", 0);
+        for (auto entry : {std::pair<const char *, float>{"bass", 100}, {"lowMid", 250}, {"mid", 700}, {"highMid", 1500}, {"treble", 3500}})
+        {
+            const float dryLevel = toneRms(shaping, entry.second);
+            set(shaping, entry.first, 6);
+            const float boosted = toneRms(shaping, entry.second);
+            require(std::abs(boosted / dryLevel - lowline::db(6)) < .03f, "five-band EQ applies the selected band's gain");
+            set(shaping, entry.first, 0);
+        }
+        TempoPlayHead hostTempo;
+        shaping.setPlayHead(&hostTempo);
+        set(shaping, "sync", 1); set(shaping, "hostSync", 1); set(shaping, "division", 3);
+        MidiBuffer hostMessages;
+        shaping.processBlock(b, hostMessages);
+        require(shaping.usingHostTempo && std::abs(shaping.effectiveDelay.load() - 60000.f / 90) < .1f,
+                "delay follows the host's supplied tempo");
+        shaping.setPlayHead(nullptr);
+        // Portable assets survive removal of the original files.
+        auto portableModel = temp.getChildFile("portable.nam");
+        model.copyFileTo(portableModel);
+        auto portableIR = temp.getChildFile("portable.wav");
+        ir.copyFileTo(portableIR);
+        LowlineProcessor portableSource;
+        portableSource.prepareToPlay(48000, 256);
+        set(portableSource, "compOn", 0); set(portableSource, "output", 0); set(portableSource, "blend", 100);
+        set(portableSource, "pedalOn", 0); set(portableSource, "cabOn", 0);
+        portableSource.loadFile(LowlineProcessor::Pedal, portableModel);
+        portableSource.loadFile(LowlineProcessor::Amp, portableModel);
+        portableSource.loadFile(LowlineProcessor::Cab, portableIR);
+        portableSource.loadFile(LowlineProcessor::Room, portableIR);
+        wait(portableSource);
+        const int blendTarget = portableSource.midiTargetNames().indexOf("Amp blend %");
+        require(blendTarget >= 0, "blend is available for MIDI learn");
+        portableSource.armMidiLearn(blendTarget);
+        MidiBuffer learn;
+        learn.addEvent(MidiMessage::controllerEvent(2, 45, 127), 0);
+        portableSource.processBlock(b, learn);
+        require(portableSource.midiDescription().contains("CC 45") && !portableSource.midiDescription().contains("CC 11 "),
+                "MIDI learn replaces the target assignment and accepts another channel");
+        auto portablePreset = temp.getChildFile("portable.lowline");
+        portableSource.savePreset(portablePreset, true);
+        require(portablePreset.existsAsFile(), "portable preset is saved");
+        portableModel.deleteFile(); portableIR.deleteFile();
+        LowlineProcessor restored;
+        restored.prepareToPlay(48000, 256);
+        restored.openPreset(portablePreset); wait(restored);
+        require(restored.slotName(LowlineProcessor::Amp) != "(empty)" && restored.slotName(LowlineProcessor::Room) != "(empty)",
+                "portable preset restores models and IRs without original paths");
+        settle(restored, b, .2f);
+        require(std::abs(b.getSample(0, 255) - .1f) < .002f, "portable NAM still produces the expected output");
+        require(restored.midiDescription().contains("CC 45"), "MIDI learn survives preset export and restore");
+        MidiBuffer expression;
+        expression.addEvent(MidiMessage::controllerEvent(1, 45, 0), 0);
+        restored.processBlock(b, expression);
+        require(restored.state.getRawParameterValue("blend")->load() == 0, "learned expression CC controls the target");
+        auto assignedPreset = temp.getChildFile("assigned.lowline");
+        set(restored, "blend", 33); restored.savePreset(assignedPreset);
+        restored.assignProgram(8, assignedPreset); set(restored, "blend", 77);
+        MidiBuffer pc;
+        pc.addEvent(MidiMessage::programChange(1, 8), 0); restored.processBlock(b, pc);
+        for (int i = 0; i < 200 && std::abs(restored.state.getRawParameterValue("blend")->load() - 33) > .01f; ++i) Thread::sleep(10);
+        wait(restored);
+        require(std::abs(restored.state.getRawParameterValue("blend")->load() - 33) < .01f &&
+                restored.programAssignment(8) == assignedPreset.getFullPathName(),
+                "Program Change recalls a user preset without erasing its bank mapping");
+        set(restored, "sync", 1); set(restored, "hostSync", 0); set(restored, "tempo", 120); set(restored, "division", 2);
+        MidiBuffer tempoMessages; restored.processBlock(b, tempoMessages);
+
+        require(std::abs(restored.effectiveDelay.load() - 375) < .01f, "processor applies manual tempo sync");
+        set(restored, "tunerOn", 1); set(restored, "tunerMute", 1);
+        settle(restored, b, .2f);
+        require(b.getMagnitude(0, 256) < .00001f, "tuner mute fades the output to silence");
+        auto quieter = temp.getChildFile("quieter.nam");
+        quieter.replaceWithText(R"({"version":"0.5.4","architecture":"Linear","config":{"receptive_field":1,"bias":false},"weights":[0.25],"sample_rate":48000,"metadata":{"loudness":-24.0}})");
+        LowlineProcessor transitions;
+        transitions.prepareToPlay(48000, 256);
+        set(transitions, "compOn", 0); set(transitions, "output", 0); set(transitions, "blend", 100);
+        transitions.loadFile(LowlineProcessor::Amp, model); wait(transitions); settle(transitions, b, .2f);
+        transitions.loadFile(LowlineProcessor::Amp, quieter); wait(transitions);
+        float last = .1f, maxJump = 0;
+        MidiBuffer transitionMessages;
+        for (int block = 0; block < 30; ++block)
+        {
+            for (int channel = 0; channel < 2; ++channel)
+                for (int sample = 0; sample < 256; ++sample) b.setSample(channel, sample, .2f);
+            transitions.processBlock(b, transitionMessages);
+            for (int sample = 0; sample < 256; ++sample)
+            {
+                const float current = b.getSample(0, sample);
+                maxJump = std::max(maxJump, std::abs(current - last)); last = current;
+            }
+        }
+        require(maxJump < .001f && std::abs(last - .05f) < .001f,
+                "NAM replacement crossfades instead of stepping or bypassing the rig");
+        set(transitions, "normOn", 1); set(transitions, "normTarget", -18);
+        settle(transitions, b, .2f);
+        require(transitions.normalisationAvailable[1] && std::abs(b.getSample(0, 255) - .05f * lowline::db(6)) < .001f,
+                "NAM metadata normalisation applies the bounded target gain");
+        // A legacy tree without new parameters must reset them to neutral defaults.
+        auto legacy = transitions.state.copyState();
+        for (int i = legacy.getNumChildren(); --i >= 0;)
+            if (legacy.getChild(i).getProperty("id").toString() == "normOn") legacy.removeChild(i, nullptr);
+        auto legacyXml = legacy.createXml(); MemoryBlock legacyBytes;
+        AudioProcessor::copyXmlToBinary(*legacyXml, legacyBytes);
+        transitions.setStateInformation(legacyBytes.getData(), int(legacyBytes.getSize())); wait(transitions);
+        require(transitions.state.getRawParameterValue("normOn")->load() == 0,
+                "old presets receive neutral defaults for new parameters");
+        LowlineCaptureSlot rateChange;
+        auto fixedRate = std::make_unique<LowlineCapture>();
+        fixedRate->model = std::make_unique<nam::DSP>(1, 1, 48000);
+        fixedRate->prepare(48000, 256); rateChange.publish(std::move(fixedRate));
+        require(!rateChange.prepare(44100, 256), "fixed-rate capture reports incompatible device configuration");
+        for (int ch = 0; ch < 2; ++ch)
+            for (int i = 0; i < 256; ++i) b.setSample(ch, i, .2f);
+        rateChange.process(b, 256, true, false, -18);
+        require(std::abs(b.getSample(0, 255) - .2f) < .001f,
+                "incompatible capture passes through safely after a device rate change");
+        std::atomic<bool> audioValid{true};
+        std::thread audioThread([&]
+        {
+            AudioBuffer<float> audio(2, 256); MidiBuffer messages;
+            for (int block = 0; block < 350; ++block)
+            {
+                for (int ch = 0; ch < 2; ++ch)
+                    for (int i = 0; i < 256; ++i) audio.setSample(ch, i, .2f);
+                transitions.processBlock(audio, messages);
+                for (int ch = 0; ch < 2; ++ch)
+                    for (int i = 0; i < 256; ++i)
+                        if (!std::isfinite(audio.getSample(ch, i)) || std::abs(audio.getSample(ch, i)) > .21f)
+                            audioValid = false;
+                Thread::sleep(1);
+            }
+        });
+        for (int request = 0; request < 40; ++request)
+        {
+            transitions.loadFile(LowlineProcessor::Amp, request % 2 ? quieter : model);
+            Thread::sleep(3);
+        }
+        audioThread.join(); wait(transitions);
+        settle(transitions, b, .2f);
+        require(audioValid && std::abs(b.getSample(0, 255) - .05f) < .001f,
+                "concurrent rapid capture loading remains finite and reaches the last requested model");
+        MemoryBlock invalidPortable;
+        require(portablePreset.loadFileAsData(invalidPortable), "read portable fixture");
+        auto invalidXml = AudioProcessor::getXmlFromBinary(invalidPortable.getData(), int(invalidPortable.getSize()));
+        auto invalidTree = ValueTree::fromXml(*invalidXml);
+        invalidTree.setProperty("ext0", ".exe", nullptr);
+        auto invalidAssetXml = invalidTree.createXml(); invalidPortable.reset();
+        AudioProcessor::copyXmlToBinary(*invalidAssetXml, invalidPortable);
+        auto invalidAssetPreset = temp.getChildFile("invalid-asset.lowline");
+        invalidAssetPreset.replaceWithData(invalidPortable.getData(), invalidPortable.getSize());
+        set(restored, "blend", 44); restored.openPreset(invalidAssetPreset);
+        require(restored.state.getRawParameterValue("blend")->load() == 44 && restored.status().contains("Invalid"),
+                "invalid portable asset is rejected before changing controls");
         model.deleteFile();
         p.loadFile(LowlineProcessor::Amp, model);
         wait(p);
@@ -313,6 +531,15 @@ int main(int argc, char **argv)
             PNGImageFormat fmt;
             fmt.writeImageToStream(img, out);
             std::cout << png.getFullPathName() << "\n";
+            for (const auto *page : {"tools", "midi"})
+            {
+                auto *button = dynamic_cast<TextButton *>(e->findChildWithID(String("tab-") + page));
+                require(button != nullptr, "new page navigation exists");
+                button->onClick();
+                FileOutputStream pageOut(File::getCurrentWorkingDirectory().getChildFile(String("lowline-") + page + "-preview.png"));
+                pageOut.setPosition(0); pageOut.truncate();
+                fmt.writeImageToStream(e->createComponentSnapshot(e->getLocalBounds()), pageOut);
+            }
             File helpPng = File::getCurrentWorkingDirectory().getChildFile("lowline-help-preview.png");
             FileOutputStream helpOut(helpPng);
             helpOut.setPosition(0);

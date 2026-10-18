@@ -1,44 +1,47 @@
-# Validation — Lowline 0.1.1
+# Validation — Lowline 0.2.0
 
-Verified code commit: `de01e0c53f7e0607f9c87c7282f501cec16c4074`. [Successful three-platform run](https://github.com/MassimoDanieli/lowline/actions/runs/39131092496).
+## Local verification
 
-The emerald/amber palette was built and tested on all three platforms. The updated native editor preview was rendered on Linux in CI and visually inspected. Mac archive inspection below refers to the previous 0.1.1 package; the current run repeats the standalone universal-architecture check.
+Configured and compiled the native Linux standalone, VST3 and test executable in Release mode with GCC 13.3, JUCE 8.0.6 and the pinned NAM core. The expanded regression suite exercises actual processor and model loading paths, not a mock audio engine.
 
-The bilingual offline help build also passes the audio regression suite on macOS, Windows and Linux. Additional checks verify the help action, all twelve Italian and English topics, UTF-8 decoding and preservation of the selected topic across language changes. The main editor and Italian help content were rendered in CI and visually inspected.
+New checks cover:
 
-## Validation history
+- Tuner fundamentals from low B (30.8677 Hz) through 440 Hz with added harmonics, within four cents on these synthetic fixtures; silence and DC rejection.
+- Noise suppression below the gate threshold and reopening on a played-level signal.
+- Gain response of all five EQ bands and low-frequency retention / high-frequency rejection of the clean low-pass.
+- Dotted/half-note delay calculations, actual host tempo following and manual tempo sync.
+- MIDI learn, replacement of previous mappings, expression control, save/restore and Program Change recall of user presets without losing the current bank.
+- Portable export containing models and cabinet/room IRs, then import after deleting the source files; restored NAM processing, and rejection of an invalid embedded asset type before changing controls.
+- Tuner output mute; NAM loudness metadata compensation; neutral defaults when older presets omit new parameters.
+- Known-gain NAM replacements with a maximum per-sample transition step below 0.001 on the constant-input fixture; concurrent rapid loading while audio processing continues, reaching the last requested model.
+- Rejection/bypass of an incompatible fixed-rate capture after device configuration changes. Linear NAM supports its own rate conversion, so the fixed-rate case uses NAM's base DSP contract rather than falsely treating Linear as fixed-rate.
+- Native editor construction, twelve indexed help topics in each language, UTF-8 accents and language switching. RIG, TOOLS, MIDI and help snapshots are rendered from JUCE and visually inspected.
 
-- Configured and compiled the native Linux standalone app and VST3 module in Release mode with GCC 13.3 and C++20.
-- GitHub Actions compiled the app/plugins and passed the regression suite on Linux x64, Windows x64 and macOS. The Mac target builds both arm64 and x86_64; tests execute on the runner's native architecture, not separately on two physical Macs.
-- Downloaded and inspected the uploaded Mac archive: standalone app, AU and VST3 each contain arm64 and x86_64 slices, executable permissions are preserved, app version is 0.1.1 and the microphone usage description is present.
-- The corrected Mac packaging check reports `x86_64 arm64` and verifies both slices before uploading the archive.
-- Linked the full NAM architecture registry into the final targets; VST3 module metadata was generated successfully by JUCE.
-- Ran the compiled audio regression executable and CTest. The suite passed.
-- Instantiated the native JUCE editor, rendered it to PNG and inspected the actual image. Fixed editor initialisation order and non-ASCII literal display issues found during these checks.
+Existing regression checks remain: compression, ping-pong repeats, disabled-delay input rejection, clean path and polarity, real NAM loading against a Linear gain fixture, cabinet convolution, invalid-load preservation, state roundtrip, oversized audio blocks, nonfinite input recovery, factory recall, stale-model clearing, missing-asset errors, mono folding of stereo IRs, limiter peak containment/stereo balance and exact 1 ms reported latency including host bypass.
 
-The 0.1.1 regression checks additionally cover limiter overload peak containment, stereo balance, exact 1 ms latency and its host reporting, disabled delay input rejection, host bypass latency, out-of-range MIDI PC, deterministic factory recall, clearing a NAM before reprepare, foreign XML rejection, missing preset assets and sticky errors, and mono output with asymmetric stereo IRs for both mono and stereo inputs.
+## Cross-platform builds
 
-The original suite checks compressor reduction, left/right ping-pong repeats, unity clean and unloaded amp paths, clean polarity, output ceiling, actual `.nam` model loading and processing against a known-gain Linear NAM fixture, the clean/NAM blend result, loading and processing a WAV cabinet IR, preservation of the active model after an invalid load, preset state roundtrip, larger-than-prepared audio blocks, nonfinite input containment and recovery, MIDI CC blend control and editor construction.
+The Native builds workflow compiles and runs the suite on Linux x64, Windows x64 and macOS. Mac binaries contain arm64 and x86_64 slices; tests execute on the runner's architecture. The workflow checks the standalone universal architectures before packaging Standalone, VST3 and AU.
 
-The model fixture is generated by the test itself and has one coefficient; this verifies the real loader and processing API, not the sound or performance of a complex captured amplifier. No claim is made that arbitrary A2 community captures have been audibly or performance-tested.
+A verified run and direct package links are recorded in README once the run completes. CI output includes regression logs and native UI previews.
 
-## Not run here
+## Practical limits
 
-- AU validation inside a DAW, DAW scanning and recording.
-- Scarlett/audio-device playback, practical latency/dropouts or CPU measurement.
-- Real MIDI footswitches, live preset changes or real community-model comparisons.
-- Listening tests, automatic phase alignment, Apple signing or notarisation.
+These are software and synthetic-signal checks. They do not establish Scarlett round-trip latency, real-time performance with arbitrary community captures, tuner accuracy on every bass/pickup/playing style, DAW plugin validation or subjective sound quality. No Apple Developer-ID signing or notarisation has been performed.
 
-GitHub Actions runs are available in [the repository](https://github.com/MassimoDanieli/lowline/actions). Native compilation and the software regression suite are CI checks, not evidence of Scarlett latency, audible sound quality or notarisation.
+A 50 ms capture crossfade temporarily processes two engines per transitioning slot. It removes an abrupt pointer swap but does not guarantee an inaudible change for phase-mismatched models or an overloaded CPU. Full preset recall applies parameters and prepares slots sequentially; it is not an atomic scene switch and does not preserve long IR tails beyond the fade. Rapid pending capture requests may be coalesced to the latest prepared engine.
+
+NAM level compensation uses valid loudness metadata and a bounded gain, not runtime LUFS measurement or physical input calibration. The clean crossover is a low-pass on the clean branch, with the processed branch remaining full-range. MIDI is applied at block boundaries and expression-pedal calibration remains external. CPU is smoothed callback time relative to the block budget, not total system utilisation.
+
+Portable presets include loaded slot assets, but not other preset files referenced by Program Change assignments. Imported assets are stored in a persistent per-user cache; ordinary subsequent saves refer to those paths.
 
 ## Reproduce
 
-After building, run `ctest --test-dir build -C Release --output-on-failure`.
+Build with CMake, then run:
 
-To regenerate the editor preview on macOS/Linux:
+```sh
+ctest --test-dir build -C Release --output-on-failure
+build/LowlineTests_artefacts/Release/LowlineTests --screenshot
+```
 
-`build/LowlineTests_artefacts/Release/LowlineTests --screenshot`
-
-On Windows append `.exe`. Some headless environments need an X display such as Xvfb.
-
-Source provenance and pinned dependency versions are in `THIRD_PARTY_NOTICES.md` and `CMakeLists.txt`.
+On Windows append `.exe`; headless Linux may need `xvfb-run -a`. Screenshots are written into the working directory. Source and dependency provenance are in THIRD_PARTY_NOTICES.md.

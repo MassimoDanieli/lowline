@@ -1,7 +1,7 @@
-# Lowline — Guida utente
+# Lowline 0.2 — Guida utente
 
 ## 01 · Inizia da qui
-Lowline è un rig per basso: combina compressore, booster, due modelli NAM, cassa a risposta impulsiva (IR), equalizzatore, suono pulito parallelo, delay stereo e riverbero IR. Funziona come app autonoma oppure come plugin VST3; su Mac è disponibile anche AU.
+Lowline è un rig per basso: combina gate, compressore, booster, due modelli NAM, cassa a risposta impulsiva (IR), equalizzatore, suono pulito parallelo, delay stereo e riverbero IR. Funziona come app autonoma oppure come plugin VST3; su Mac è disponibile anche AU.
 
 Per una prima prova:
 1. Collega il basso alla Scarlett, attiva INST sull'ingresso usato e abbassa il volume delle cuffie.
@@ -14,26 +14,28 @@ Per una prima prova:
 
 Il verde indica un pulsante attivo; un pulsante scuro è spento. Le parole “ON” sono etichette fisse: guarda il colore per conoscere lo stato. Una spia attiva non significa che nello slot sia stato caricato un file.
 
-Apri GUIDA dalla schermata principale. Scegli un argomento dall'indice; IT / EN cambia la lingua di questa guida. La guida è inclusa nell'app e funziona senza Internet.
+Le schede RIG, STRUMENTI e MIDI separano catena audio, strumenti di regolazione e pedaliere. In STRUMENTI trovi accordatore, gate, EQ, crossover, normalizzazione e tempo del delay.
+
+Apri GUIDA dalla schermata principale. Scegli un argomento dall'indice; ENGLISH / ITALIANO cambia la lingua di questa guida. La guida è inclusa nell'app e funziona senza Internet.
 
 ## 02 · Percorso del segnale e interfaccia
 Il percorso è:
-Ingresso selezionato → INPUT → compressore → divisione in due rami.
+Ingresso selezionato → INPUT → gate → compressore → divisione in due rami.
 
 Ramo elaborato: BOOST → NAM pedal → NAM amp → EQ → cassa IR.
-Ramo pulito: CLEAN ALIGN → CLEAN PHASE.
+Ramo pulito: filtro CLEAN LP opzionale → CLEAN ALIGN → CLEAN PHASE.
 
 AMP / CLEAN unisce i due rami; seguono delay stereo → riverbero IR → OUTPUT → limiter finale.
 
-Il ramo pulito parte DOPO il compressore: “pulito” significa senza booster, NAM, EQ e cassa, ma può essere compresso. Delay e riverbero agiscono sul mix dei due rami.
+Il ramo pulito parte DOPO gate e compressore: “pulito” significa senza booster, NAM, EQ e cassa, ma può essere compresso. Delay e riverbero agiscono sul mix dei due rami.
 
 Input 1 / Left usa il primo canale; Input 2 / Right usa il secondo, se disponibile. Stereo > Mono fa la media dei due ingressi: non conserva una sorgente stereo. Il rig parte da uno strumento mono; gli effetti e le IR stereo possono creare ampiezza all'uscita.
 
 Trascina una manopola per cambiarla; fai doppio clic per ripristinare il valore predefinito del parametro. Puoi modificare direttamente il numero sotto la manopola e premere Invio.
 
-SALVA e APRI gestiscono i preset .lowline. Il menu in alto a destra contiene quattro configurazioni iniziali di fabbrica. IT / EN nella schermata principale cambia la lingua dell'interfaccia; i nomi tecnici dei controlli restano in inglese.
+SALVA e APRI gestiscono i preset .lowline. ESPORTA crea un preset portabile con modelli e IR incorporati. Il menu in alto a destra contiene quattro configurazioni iniziali di fabbrica. IT / EN nella schermata principale cambia la lingua dell'interfaccia; i nomi tecnici dei controlli restano in inglese.
 
-## 03 · Ingresso, uscita e indicatori
+## 03 · Livelli, CPU e accordatore
 INPUT: da −36 a +24 dB. Regola il segnale prima del compressore e dei modelli. Aumentarlo può far saturare maggiormente una cattura NAM: non equivale ad alzare soltanto il volume finale.
 
 OUTPUT: da −36 a +12 dB. Regola il livello dopo gli effetti e prima del limiter. Parti da −6 dB e confronta i suoni a volume simile.
@@ -46,7 +48,17 @@ LIMIT indica che il limiter sta riducendo il livello. Abbassa OUTPUT, MAKEUP o i
 
 BYPASS salta la catena del rig, conservando selezione dell'ingresso, INPUT, OUTPUT e protezione finale. Non è un confronto a volume automaticamente pareggiato. Il bypass del plugin nel programma ospite conserva la latenza dichiarata.
 
-## 04 · Compressore: rendere il basso uniforme
+CPU mostra il tempo impiegato dal callback audio come percentuale del tempo disponibile per ogni blocco, con una media smussata. Non è l'utilizzo totale del processore: un picco vicino o oltre 100% può causare interruzioni. Durante un cambio cattura vengono elaborati temporaneamente due motori.
+
+ACCORDATORE (scheda STRUMENTI): attiva TUNER e suona una corda alla volta. Mostra nota, ottava, frequenza e scostamento in cent; ±3 cent è evidenziato in verde. A4 REFERENCE regola il riferimento da 430 a 450 Hz (default 440). Sono ricercate fondamentali da 25 a 500 Hz, compreso il Si basso di un cinque corde. Il rilevamento è monofonico: armonici molto forti, rumore e accordi possono confonderlo. Lascia stabilizzare la nota per una frazione di secondo.
+
+MUTE silenzia gradualmente l'uscita soltanto quando TUNER è attivo. Spegnere TUNER ripristina il suono anche se MUTE resta selezionato. L'accordatore legge l'ingresso prima di gate ed effetti; il suo lavoro di analisi avviene in un thread separato.
+
+## 04 · Gate e compressore: rendere il basso uniforme
+GATE ON, in STRUMENTI, attenua il rumore nelle pause prima del compressore. GATE THRESHOLD (−80…−10 dB) è la soglia d'apertura; GATE RELEASE (20…1000 ms) determina la chiusura graduale. L'apertura è di circa 2 ms, con mantenimento di 40 ms e isteresi di 3 dB per evitare oscillazioni vicino alla soglia.
+
+Parti da −55 dB e 150 ms. Smetti di suonare e alza lentamente la soglia fino a ridurre il rumore; poi verifica che le note deboli e il sustain non vengano tagliati. Il gate è inizialmente spento per mantenere compatibilità con i vecchi preset.
+
 COMP ON attiva il compressore prima della divisione pulito/elaborato.
 
 THRESHOLD (−60…0 dB): soglia oltre la quale aumenta la compressione. Abbassala per comprimere più note.
@@ -70,12 +82,18 @@ CAB ospita una IR di cassa mono o stereo in formato WAV o AIFF, fino a 2 secondi
 
 Una cattura può già includere cassa e microfono. In quel caso prova CAB spento per evitare di filtrare due volte il suono. Controlla sempre la descrizione fornita dall'autore della cattura.
 
-Sono accettati modelli .nam mono con ingresso e uscita mono. Il core supporta A2, ma compatibilità e carico CPU dipendono dalla cattura. Se la frequenza richiesta non coincide con quella del dispositivo, segui il messaggio di stato, cambia frequenza e ricarica il modello. Lowline non normalizza automaticamente il volume delle catture.
+Sono accettati modelli .nam mono con ingresso e uscita mono. Il core supporta A2, ma compatibilità e carico CPU dipendono dalla cattura. Se la frequenza richiesta non coincide con quella del dispositivo, segui il messaggio di stato, cambia frequenza e ricarica il modello. NORMALISE, nella scheda STRUMENTI, abilita una compensazione del volume basata sul campo loudness del modello NAM. NAM TARGET imposta il riferimento da −30 a −6 dB; la correzione per ciascun modello è limitata a ±18 dB e viene applicata gradualmente. Il valore di default è −18 dB.
+
+PEDAL e AMP mostrano il loudness dichiarato; “nessun dato” significa che la cattura è vuota o non include un dato valido. In quel caso Lowline lascia il guadagno del modello invariato: non inventa una misura e non fa un'analisi automatica del volume percepito. La compensazione del PEDAL modifica anche il livello che entra nell'AMP, quindi può cambiarne la saturazione. La calibrazione fisica d'ingresso in dBu resta manuale.
+
+Il cambio NAM/IR usa una dissolvenza di 50 ms fra il motore precedente e quello nuovo, preparato fuori dal callback audio. Se arrivano molte richieste, viene conservata quella più recente in attesa. Il carico aumenta temporaneamente; la dissolvenza non garantisce che ogni combinazione di catture, fase e carico CPU risulti inudibile. Le lunghe code IR non vengono mantenute oltre la transizione.
 
 TONE3000 apre il sito nel browser: scarica tu il file e poi caricalo nello slot corretto. Non c'è un downloader integrato. Modelli e IR non sono inclusi.
 
 ## 06 · EQ e suono pulito parallelo
-BASS / 100 Hz, MID / 700 Hz e TREBLE / 3.5 kHz regolano tre filtri a campana da −12 a +12 dB. Le frequenze sono fisse. L'EQ agisce soltanto sul ramo elaborato, prima della cassa IR.
+L'EQ è nella scheda STRUMENTI. Cinque filtri a campana regolano il guadagno da −12 a +12 dB: BASS (100 Hz), LOW MID (default 250 Hz), MID (default 700 Hz), HIGH MID (default 1500 Hz) e TREBLE (3500 Hz).
+
+LOW MID FREQ varia da 80 a 800 Hz; MID FREQ da 150 a 2500 Hz; HIGH MID FREQ da 500 a 6000 Hz. Le bande possono sovrapporsi: usa piccoli cambiamenti e confronta il volume. Le due bande aggiuntive partono da 0 dB, e i vecchi preset conservano le regolazioni originali. L'EQ agisce soltanto sul ramo elaborato, prima della cassa IR.
 
 AMP / CLEAN indica la percentuale del ramo elaborato:
 • 0% = solo ramo pulito.
@@ -86,7 +104,7 @@ Il nome AMP / CLEAN non significa che agisca soltanto sul modello amp: il ramo e
 
 CLEAN PHASE inverte la polarità del ramo pulito. Se miscelando i due rami il basso perde corpo, confronta le due posizioni e conserva quella più piena.
 
-CLEAN ALIGN ritarda il pulito da 0 a 20 ms per compensare ritardi presenti nelle catture o nelle IR. Parti da 0, usa temporaneamente un blend vicino al 50% e aumenta di pochissimo ascoltando le note basse. Non è un allineamento automatico; non serve compensare qui l'intera latenza della scheda. Nessun crossover separa le basse dal resto del suono pulito.
+CLEAN ALIGN ritarda il pulito da 0 a 20 ms per compensare ritardi presenti nelle catture o nelle IR. Parti da 0, usa temporaneamente un blend vicino al 50% e aumenta di pochissimo ascoltando le note basse. Non è un allineamento automatico; non serve compensare qui l'intera latenza della scheda. CLEAN LP attiva un passa-basso a 12 dB/ottava sul solo ramo pulito. CLEAN LOW PASS sceglie il taglio fra 50 e 1000 Hz (default 180). Serve a conservare il fondo pulito mentre il ramo elaborato fornisce carattere e armonici. Il ramo elaborato resta a banda intera: non è una separazione complementare delle frequenze. A 0% di blend e CLEAN LP attivo sentirai soltanto il pulito filtrato.
 
 ## 07 · Delay stereo
 DELAY ON rende udibili le ripetizioni e invia nuove note al delay.
@@ -99,7 +117,11 @@ PING PONG: alterna le ripetizioni tra sinistra e destra. Per sentirlo chiarament
 
 Punto di partenza: TIME 380 ms, FEEDBACK 27%, DELAY LEVEL 18%, HIGH CUT 3500 Hz.
 
-Il delay non si sincronizza automaticamente al tempo della DAW e non ha tap tempo. Per una semiminima usa TIME = 60000 / BPM; a 120 BPM sono 500 ms. Per una croma dimezza il valore; per una croma puntata usa il 75% del valore della semiminima.
+SYNC, in STRUMENTI, calcola il ritardo da TEMPO e dalla suddivisione scelta: 1/16, 1/8, 1/8 puntata, 1/4, 1/4 puntata o 1/2. A 120 BPM, 1/4 vale 500 ms e 1/8 puntata 375 ms. Con SYNC attivo TIME viene ignorato; la durata effettiva è mostrata sotto il selettore.
+
+HOST BPM usa il tempo comunicato dalla DAW, se disponibile e compreso fra 30 e 300 BPM. In standalone o senza un tempo valido si usa TEMPO (30…240 BPM). Il testo DAW/Manual indica quale sorgente è in uso. TAP ricava il tempo dall'intervallo fra due pressioni, fra 250 e 2000 ms: premi regolarmente almeno due volte. Se HOST BPM sta fornendo un tempo valido, disattivalo per usare quello battuto. TAP è assegnabile anche via MIDI learn.
+
+DELAY LOW CUT (0…1000 Hz) riduce le basse delle ripetizioni e del feedback; 0 lo disattiva. Prova 100–200 Hz se gli echi impastano il basso. HIGH CUT rimane nella scheda RIG. Il ritardo sincronizzato può superare i 1500 ms del controllo manuale.
 
 Spegnere il delay interrompe l'invio di nuove note e ne sfuma l'uscita. Non è un sistema di cambio preset con code garantite: una memoria precedente può essere ancora presente se lo riattivi presto.
 
@@ -113,11 +135,15 @@ Senza una IR caricata, attivare REVERB ON non crea un riverbero. Il file determi
 La normalizzazione delle IR è gestita dal motore di convoluzione; non equivale a pareggiare automaticamente il volume dei modelli NAM. Il timing iniziale della IR viene conservato. Una IR lunga può richiedere più risorse: se senti interruzioni, prova una IR più corta o aumenta il buffer.
 
 ## 09 · Preset, file e trascinamento
-SALVA crea un preset .lowline; APRI lo richiama. I preset e le sessioni della DAW memorizzano controlli, lingua e percorsi assoluti ai file NAM/IR. Non incorporano i modelli né le IR.
+SALVA crea un preset .lowline leggero con controlli, lingua, mappature MIDI, abbinamenti Program Change e percorsi assoluti ai file NAM/IR. Le sessioni della DAW conservano lo stesso stato. APRI richiama sia preset normali sia portabili.
 
-Per conservare un suono: tieni gli asset in una cartella stabile, salva il preset e annota quali file usi. Per trasferirlo su un altro computer copia anche gli asset, ricaricali dagli slot sul nuovo sistema e salva di nuovo il preset. Lo spostamento non è automatico.
+ESPORTA crea un .lowline portabile che include copie dei modelli e delle IR caricate nei quattro slot. Il limite è 64 MB per asset e 192 MB totali; se manca un file o supera il limite, l'esportazione viene annullata. Attendi che Loading sia terminato prima di salvare. Incorpora e condividi soltanto asset che hai diritto di ridistribuire.
 
-La “x” cancella un file dallo slot. Un messaggio di errore può indicare un file mancante, un formato incompatibile o una frequenza errata: controlla la barra di stato in basso. Durante Loading attendi il completamento prima di valutare il suono. Cambiare cattura può produrre una discontinuità: fallo tra una frase e l'altra.
+All'apertura gli asset incorporati vengono estratti in una cache persistente Lowline/Assets nella cartella dati dell'utente. Non servono più i percorsi originali. I successivi salvataggi normali fanno riferimento alla cache: usa nuovamente ESPORTA per trasferirli. I percorsi verso altri preset assegnati ai Program Change non sono incorporati ricorsivamente; trasferisci anche quei preset e riassegnali se necessario.
+
+Per conservare un suono: tieni gli asset in una cartella stabile, salva il preset e annota quali file usi. Per trasferire un preset normale copia anche gli asset e ricaricali; in alternativa usa ESPORTA per ottenere un unico file portabile.
+
+La “x” cancella un file dallo slot. Un messaggio di errore può indicare un file mancante, un formato incompatibile o una frequenza errata: controlla la barra di stato in basso. Durante Loading attendi il completamento prima di valutare il suono. Il cambio cattura usa una dissolvenza di 50 ms. Un preset completo applica i controlli e carica gli slot in successione: non è un cambio scena atomico con tutte le code preservate.
 
 Trascinamento:
 • Un .nam sulla finestra va nello slot AMP; per PEDAL usa il suo pulsante.
@@ -129,7 +155,9 @@ Le quattro configurazioni di fabbrica sono punti di partenza: Clean foundation, 
 ## 10 · MIDI e pedaliere
 Nell'app autonoma abilita il controller nelle impostazioni Audio/MIDI. Nel plugin instrada il MIDI dalla DAW a Lowline; la procedura dipende dal programma ospite. Lowline accetta tutti i canali MIDI.
 
-Program Change 0…3 richiama, nell'ordine, i quattro preset di fabbrica. Alcune pedaliere li mostrano come 1…4: controlla il messaggio realmente trasmesso. Non richiama i preset .lowline salvati e gli altri numeri sono ignorati.
+Program Change 0…3 richiama, nell'ordine, i quattro preset di fabbrica. Alcune pedaliere li mostrano come 1…4: controlla il messaggio realmente trasmesso. Nella scheda MIDI puoi assegnare un file .lowline a qualsiasi PC 0…127: scegli il numero, premi ASSEGNA PRESET e seleziona il file. CLEAR PC rimuove l'abbinamento. Un abbinamento personale prevale sul preset di fabbrica; i numeri senza abbinamento oltre 3 vengono ignorati. Il caricamento avviene nel worker, quindi include il tempo necessario a leggere e preparare i file.
+
+SALVA conserva la banca nel preset/sessione corrente. Un richiamo tramite PC mantiene la banca e il MIDI learn correnti, così il preset caricato non cancella i comandi della pedaliera. APRI manualmente ripristina invece le mappature salvate nel file.
 
 Control Change (CC):
 20 = compressore
@@ -145,7 +173,11 @@ Control Change (CC):
 
 Per CC 20…27: valori 0…63 spengono, 64…127 accendono. Configura un interruttore che alterni 0 e 127. Un pulsante momentaneo può tenere acceso l'effetto soltanto finché è premuto, secondo la sua programmazione.
 
-Un pedale d'espressione che invia CC 11 può regolare il blend, ma Lowline non offre MIDI learn, rimappatura, calibrazione del pedale o tap tempo. I messaggi sono applicati all'inizio del blocco audio, non al singolo campione.
+MIDI LEARN: scegli il parametro nel menu, premi LEARN e muovi il controllo della pedaliera. Il prossimo CC ricevuto viene associato al parametro; la precedente associazione di quel parametro viene rimossa. CANCEL annulla l'attesa, CLEAR rimuove l'associazione del parametro selezionato e RESET ripristina la mappa iniziale riportata sopra. La lista mostra i CC assegnati.
+
+I controlli continui usano l'intervallo completo del parametro con valori 0…127; quindi OUTPUT appreso via learn raggiunge +12 dB, mentre il CC 7 predefinito mantiene il limite storico di +6 dB. I pulsanti usano 0…63 spento e 64…127 acceso. Tap tempo reagisce al passaggio dal valore basso a quello alto: la pedaliera deve inviare anche il rilascio.
+
+Un pedale d'espressione può controllare blend, output o altri parametri. Calibra il suo intervallo sulla pedaliera: Lowline non offre ancora calibrazione min/max o curve personalizzate. Le associazioni accettano tutti i canali; i messaggi si applicano all'inizio del blocco audio, non al singolo campione.
 
 ## 11 · Uso come plugin su Mac, Windows e Linux
 Standalone è l'app autonoma. VST3 è il plugin per un host compatibile; AU è il formato Mac usato, per esempio, da GarageBand e Logic. Installa soltanto i formati che ti servono.
@@ -170,10 +202,12 @@ Sento due bassi o un effetto “vuoto”: disattiva il direct monitoring; verifi
 
 Suono distorto: controlla prima il clipping della Scarlett; poi riduci INPUT, BOOST, MAKEUP e OUTPUT secondo il punto che satura. Un modello NAM può distorcere per sua natura. LIMIT segnala il limiter di uscita, non il clipping fisico dell'ingresso.
 
-Crepitii o ritardo eccessivo: aumenta il buffer per ridurre le interruzioni, diminuiscilo se vuoi meno latenza e il computer regge. Prova catture più leggere e IR più corte. Il limiter aggiunge circa 1 ms, oltre a dispositivo, buffer e altri plugin. Il carico CPU non è visualizzato in Lowline.
+Crepitii o ritardo eccessivo: aumenta il buffer per ridurre le interruzioni, diminuiscilo se vuoi meno latenza e il computer regge. Prova catture più leggere e IR più corte. Il limiter aggiunge circa 1 ms, oltre a dispositivo, buffer e altri plugin. Controlla anche il valore CPU, che misura il tempo di elaborazione audio rispetto al budget del blocco.
 
-Preset diverso o file mancanti: conserva i percorsi originali oppure ricarica gli asset e salva nuovamente. Nessun modello è incluso nel preset.
+Preset diverso o file mancanti: conserva i percorsi originali oppure ricarica gli asset e salva nuovamente. SALVA usa percorsi; ESPORTA include i modelli e le IR.
 
 NAM non caricato: leggi la barra di stato, verifica file mono compatibile e sample rate richiesto. Il pulsante AMP ON da solo non carica un amplificatore.
 
-Funzioni non ancora presenti: accordatore, gate, normalizzazione dei modelli, EQ a cinque bande, crossover del pulito, sync del delay, MIDI learn, preset con asset incorporati e cambi cattura senza discontinuità. Usa l'accordatore e gli strumenti del tuo host quando servono. Le build automatiche verificano il software, non la latenza reale della Scarlett né il risultato all'ascolto.
+Limiti attuali: normalizzazione NAM solo quando è presente un loudness valido; calibrazione d'ingresso e dei pedali d'espressione manuale; nessuna garanzia di cambio scena atomico o mantenimento completo delle code. La dissolvenza di 50 ms evita il cambio secco del motore ma aumenta temporaneamente il costo CPU. L'accordatore è monofonico. Nessun modello o IR è fornito di serie.
+
+Le build automatiche verificano il software con segnali sintetici e modelli di prova. Latenza, drop-out, accuratezza su bassi reali e risultato all'ascolto devono essere provati sulla Scarlett e nel tuo host. Inizia con buffer 256 e volume basso; prova poi 128 se il sistema rimane stabile.

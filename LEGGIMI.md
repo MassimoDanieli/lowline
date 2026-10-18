@@ -1,53 +1,13 @@
-# Lowline — versione 0.1.1 per Massimo
+# Lowline 0.2 — Inizia da qui
 
-Una pedaliera virtuale per basso, con compressore e clean blend, motore NAM e casse/riverberi IR. Applicazione autonoma e progetto per plugin AU/VST3, predisposto per macOS, Windows e Linux.
+Lowline è un rig per basso per Mac, Windows e Linux. Usa l'app autonoma oppure il plugin VST3; su Mac è disponibile anche AU.
 
-## Cosa trovi qui
+Premi **GUIDA** nell'app per il manuale offline completo. Puoi leggerlo anche qui: [Italiano](docs/HELP_IT.md) · [English](docs/HELP_EN.md).
 
-Questo è il **progetto sorgente completo**, con dipendenze incluse e script per compilarlo. Questo ZIP sorgente non contiene binari: l'app Mac compilata si scarica dagli artefatti del workflow GitHub. I risultati delle verifiche effettivamente eseguite sono in `VALIDATION.md`.
+Le schede sono **RIG**, **STRUMENTI** e **MIDI**. La versione 0.2 aggiunge accordatore, gate, EQ a cinque bande, filtro sul pulito, normalizzazione NAM da metadati, sync e tap del delay, MIDI learn, preset portabili e dissolvenze nei cambi NAM/IR.
 
-Le correzioni della versione 0.1.1 sono elencate in `CHANGELOG.md`. Ora l'uscita ha un limiter stereo con 1 ms di anticipo, compensato nella DAW; i modelli rimossi non si riattivano al cambio delle impostazioni audio e il richiamo dei preset è più coerente.
+Scarica un pacchetto da una compilazione riuscita di [GitHub Actions](https://github.com/MassimoDanieli/lowline/actions). Estrai lo ZIP e poi l'archivio di piattaforma contenuto al suo interno. Per Mac scegli Lowline-macOS-universal. L'app non è notarizzata Apple.
 
-La grafica è originale: pannello scuro, accenti verde salvia e oro, controlli grandi e tutta la catena visibile. L'interfaccia permette di cambiare IT/EN; le etichette audio più comuni restano in inglese.
+Con la Scarlett: attiva INST, scegli ingresso e uscita corretti e disattiva il direct monitoring. Parti da 48 kHz e buffer 128/256; controlla il sample rate richiesto dal modello. I file NAM e IR vanno caricati separatamente.
 
-## Compilare sul tuo Mac
-
-Apri Terminale:
-
-1. Se non hai gli strumenti Apple: `xcode-select --install`, quindi completa l'installazione.
-2. Installa CMake. Se usi già Homebrew: `brew install cmake`.
-3. Entra nella cartella `lowline` estratta dallo ZIP.
-4. Esegui `bash scripts/build-mac.command`.
-
-Alla fine si apre la cartella dei risultati. In `Standalone` trovi `Lowline.app`; in `AU` il componente per GarageBand; in `VST3` il relativo plugin. Non serve una licenza Logic per l'app autonoma.
-
-Il progetto è su https://github.com/MassimoDanieli/lowline. Il workflow GitHub ha compilato e superato i test su Mac, Windows e Linux. I pacchetti pronti si scaricano dalla sezione Actions; non serve compilare sul tuo computer per provarli.
-
-## Primo utilizzo con la Scarlett
-
-- Basso nell'ingresso della Scarlett, modalità INST attiva.
-- Dalle impostazioni audio dell'app scegli Scarlett come ingresso e uscita; abilita l'ingresso audio se risulta silenziato.
-- Se il basso è nell'ingresso 1, seleziona `Input 1 / Left` in alto.
-- Cuffie sulla Scarlett e direct monitor disattivato: il segnale pulito lo aggiunge già Lowline.
-- Parti con 48 kHz e buffer 128 o 256 campioni, volume basso.
-- Il caricamento NAM segnala se il modello richiede una frequenza diversa.
-
-## I due controlli principali per basso
-
-**Compressore:** controlli completi di soglia, rapporto, attacco, rilascio e recupero manuale del volume. La sigla GR indica la riduzione di guadagno.
-
-**AMP / CLEAN:** a 0% ascolti il pulito, a 100% il ramo ampli/cassa. A metà li mescoli. Il pulito è preso dopo il compressore e viene unito prima di delay e riverbero. CLEAN PHASE inverte la polarità; CLEAN ALIGN ritarda il pulito se il modello o la cassa causano cancellazioni.
-
-Il controllo del boost attiva una saturazione semplice. Per il suono di un vero ampli/pedale carica un file `.nam` negli slot dedicati. Per la cassa carica un IR WAV/AIFF; lo stesso vale per il riverbero. Non sono inclusi modelli commerciali o catture di terzi.
-
-## Cosa manca ancora
-
-- Prova audio sul tuo Mac con la Scarlett, verifica nella DAW, firma/notarizzazione Apple.
-- Ricerca TONE3000 interna: il pulsante apre il sito nel browser, poi carichi i file scaricati.
-- MIDI learn e tap tempo: la prima versione ha associazioni CC fisse, descritte nel README.
-- Cambio preset/catture senza discontinuità; è meglio caricarle tra una frase e l'altra.
-- Oversampling del boost, conversione automatica della frequenza dei modelli, allineamento automatico delle catture.
-
-I preset salvano i percorsi dei file: tieni NAM e IR in una cartella stabile. I preset iniziali modificano alcuni controlli e non caricano suoni. Il pulsante BYPASS mantiene selezione ingresso, guadagni e protezione finale del livello.
-
-Per dettagli tecnici, licenze e compilazione su Windows/Linux, leggi `README.md`.
+SALVA conserva percorsi ai file; ESPORTA incorpora gli asset in un preset portabile. Le associazioni MIDI vengono salvate nei preset e nelle sessioni. Consulta la guida per configurarli e VALIDATION.md per i limiti delle verifiche.

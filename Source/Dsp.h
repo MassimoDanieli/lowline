@@ -47,6 +47,42 @@ struct Compressor
         return x * db(makeup - reduction);
     }
 };
+struct Gate
+{
+    float envelope = 0, gain = 1;
+    int hold = 0;
+    double rate = 48000;
+    void prepare(double sr) { rate = sr; envelope = 0; gain = 1; hold = 0; }
+    float tick(float x, bool enabled, float threshold, float releaseMs)
+    {
+        const float level = std::abs(x);
+        const float detector = std::exp(-1.f / (float(rate) * (level > envelope ? .001f : .05f)));
+        envelope = level + detector * (envelope - level);
+        if (envelope > db(threshold)) hold = int(rate * .04);
+        else if (envelope < db(threshold - 3) && hold > 0) --hold;
+        const float target = !enabled || hold > 0 ? 1.f : 0.f;
+        const float speed = target > gain ? .002f : std::max(.01f, releaseMs * .001f);
+        gain = target + std::exp(-1.f / (float(rate) * speed)) * (gain - target);
+        return x * gain;
+    }
+};
+// Two cascaded one-pole low-pass stages provide a 12 dB/octave clean branch.
+// The processed branch remains full-range.
+struct CleanCrossover
+{
+    float a = 0, b = 0;
+    void reset() { a = b = 0; }
+    float low(float x, double sr, float hz)
+    {
+        float c = 1 - std::exp(-2 * pi * std::min(hz, float(sr) * .45f) / float(sr));
+        a += c * (x - a); b += c * (a - b); return b;
+    }
+};
+inline float tempoDelay(float bpm, int division)
+{
+    constexpr float beats[] = {.25f, .5f, .75f, 1.f, 1.5f, 2.f};
+    return 60000.f / std::clamp(bpm, 30.f, 300.f) * beats[std::clamp(division, 0, 5)];
+}
 struct Biquad
 {
     float b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0, z1 = 0, z2 = 0;
@@ -60,6 +96,7 @@ struct Biquad
     }
     void peak(double sr, float f, float gain, float q = .707f)
     {
+        f = std::clamp(f, 10.f, float(sr) * .45f);
         float a = std::pow(10.f, gain / 40), w = 2 * pi * f / float(sr), al = std::sin(w) / (2 * q),
               co = std::cos(w), d = 1 + al / a;
         b0 = (1 + al * a) / d;
@@ -73,16 +110,16 @@ struct Delay
 {
     std::vector<float> l, r;
     size_t pos = 0;
-    float dampL = 0, dampR = 0;
+    float dampL = 0, dampR = 0, lowL = 0, lowR = 0;
     double sr = 48000;
     Slew time;
     void prepare(double rate)
     {
         sr = rate;
-        l.assign(size_t(sr * 2.1) + 2, 0);
+        l.assign(size_t(sr * 6.1) + 2, 0);
         r = l;
         pos = 0;
-        dampL = dampR = 0;
+        dampL = dampR = lowL = lowR = 0;
         time.prepare(sr, float(sr * .38));
     }
     float read(const std::vector<float> &v, float samples) const
@@ -95,10 +132,16 @@ struct Delay
         return v[i] + float(p - i) * (v[j] - v[i]);
     }
     void tick(float &left, float &right, float ms, float feedback, float mix, bool ping, float highcut,
-              float send = 1)
+              float send = 1, float lowcut = 0)
     {
         float n = time.next(std::clamp(ms * .001f * float(sr), 1.f, float(l.size() - 2)));
         float dl = read(l, n), dr = read(r, n);
+        if (lowcut > 0)
+        {
+            float hp = 1 - std::exp(-2 * pi * lowcut / float(sr));
+            lowL += hp * (dl - lowL); lowR += hp * (dr - lowR);
+            dl -= lowL; dr -= lowR;
+        }
         float c = 1 - std::exp(-2 * pi * highcut / float(sr));
         dampL += c * (dl - dampL);
         dampR += c * (dr - dampR);
