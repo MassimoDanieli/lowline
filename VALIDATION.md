@@ -1,8 +1,10 @@
 # Validation — Lowline 0.1.1
 
-Verified code commit: `3356ebcb89ce405bc8883516487c7eec81d796af`. [Successful three-platform run](https://github.com/MassimoDanieli/lowline/actions/runs/39129426200).
+Verified code commit: `de01e0c53f7e0607f9c87c7282f501cec16c4074`. [Successful three-platform run](https://github.com/MassimoDanieli/lowline/actions/runs/39131092496).
 
 The emerald/amber palette was built and tested on all three platforms. The updated native editor preview was rendered on Linux in CI and visually inspected. Mac archive inspection below refers to the previous 0.1.1 package; the current run repeats the standalone universal-architecture check.
+
+The bilingual offline help build also passes the audio regression suite on macOS, Windows and Linux. Additional checks verify the help action, all twelve Italian and English topics, UTF-8 decoding and preservation of the selected topic across language changes. The main editor and Italian help content were rendered in CI and visually inspected.
 
 ## Validation history
 

@@ -5,7 +5,7 @@ See `CHANGELOG.md` for the 0.1.1 maintenance fixes.
 
 Original interface and signal-chain implementation, inspired by the idea of a compact amp-and-pedals workspace. Not affiliated with NamRay, Neural Amp Modeler or TONE3000.
 
-**Development version 0.1.1.** Ready-to-run packages are published in [GitHub Actions](https://github.com/MassimoDanieli/lowline/actions/runs/39129426200): Mac universal (Apple Silicon + Intel), Windows x64 and Linux x64. The source ZIP itself contains no binaries. To compile locally, use the included scripts. Build and software tests have run on all three platforms; see `VALIDATION.md` for the limits of that verification.
+**Development version 0.1.1.** Ready-to-run packages are published in [GitHub Actions](https://github.com/MassimoDanieli/lowline/actions/runs/39131092496): Mac universal (Apple Silicon + Intel), Windows x64 and Linux x64. The source ZIP itself contains no binaries. To compile locally, use the included scripts. Build and software tests have run on all three platforms; see `VALIDATION.md` for the limits of that verification.
 
 ![Lowline interface](preview.png)
 
@@ -14,6 +14,8 @@ Original interface and signal-chain implementation, inspired by the idea of a co
 Click **GUIDA / HELP** in the app or plugin for the built-in offline guide: twelve topics, an index and Italian/English switching. Closing the guide leaves the rig running.
 
 Read it online: [Italiano](docs/HELP_IT.md) · [English](docs/HELP_EN.md).
+
+![Built-in offline guide](docs/help-preview.png)
 
 ## What it does
 
@@ -59,7 +61,7 @@ Set hardware gain so normal playing stays below clipping, then adjust Lowline in
 
 ## Download builds from GitHub Actions
 
-Open the repository's **Actions** tab, select a successful **Native builds** run, and download its **Lowline-macOS-universal**, **Lowline-Windows-x64** or **Lowline-Linux-x64** artifact. Direct packages for the verified 0.1.1 build: [Mac universal](https://github.com/MassimoDanieli/lowline/actions/runs/39129426200/artifacts/12138015372), [Windows x64](https://github.com/MassimoDanieli/lowline/actions/runs/39129426200/artifacts/12137069663), [Linux x64](https://github.com/MassimoDanieli/lowline/actions/runs/39129426200/artifacts/12137571185).
+Open the repository's **Actions** tab, select a successful **Native builds** run, and download its **Lowline-macOS-universal**, **Lowline-Windows-x64** or **Lowline-Linux-x64** artifact. Direct packages for the verified 0.1.1 build: [Mac universal](https://github.com/MassimoDanieli/lowline/actions/runs/39131092496/artifacts/12137879254), [Windows x64](https://github.com/MassimoDanieli/lowline/actions/runs/39131092496/artifacts/12138217598), [Linux x64](https://github.com/MassimoDanieli/lowline/actions/runs/39131092496/artifacts/12137269624).
 
 The outer artifact ZIP contains a platform archive; unpack that archive to find the standalone app and plugins. The Mac archive preserves bundle permissions and is checked for both arm64 and x86_64. It is not Developer-ID signed or notarised. A successful CI test is not a Scarlett or listening test. Artifacts are retained for 30 days.
 
