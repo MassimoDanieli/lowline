@@ -4,7 +4,7 @@ Una pedaliera virtuale per basso, con compressore e clean blend, motore NAM e ca
 
 ## Cosa trovi qui
 
-Questo è il **progetto sorgente completo**, con dipendenze incluse e script per compilarlo. Non contiene ancora un'app Mac pronta da trascinare in Applicazioni. I risultati delle verifiche effettivamente eseguite sono in `VALIDATION.md`.
+Questo è il **progetto sorgente completo**, con dipendenze incluse e script per compilarlo. Questo ZIP sorgente non contiene binari: l'app Mac compilata si scarica dagli artefatti del workflow GitHub. I risultati delle verifiche effettivamente eseguite sono in `VALIDATION.md`.
 
 Le correzioni della versione 0.1.1 sono elencate in `CHANGELOG.md`. Ora l'uscita ha un limiter stereo con 1 ms di anticipo, compensato nella DAW; i modelli rimossi non si riattivano al cambio delle impostazioni audio e il richiamo dei preset è più coerente.
 
@@ -21,7 +21,7 @@ Apri Terminale:
 
 Alla fine si apre la cartella dei risultati. In `Standalone` trovi `Lowline.app`; in `AU` il componente per GarageBand; in `VST3` il relativo plugin. Non serve una licenza Logic per l'app autonoma.
 
-Il progetto include anche un workflow GitHub per compilare sulle tre piattaforme. Non è stato pubblicato né eseguito nel tuo account.
+Il progetto è su https://github.com/MassimoDanieli/lowline. Il workflow GitHub ha compilato e superato i test su Mac, Windows e Linux. I pacchetti pronti si scaricano dalla sezione Actions; non serve compilare sul tuo computer per provarli.
 
 ## Primo utilizzo con la Scarlett
 
@@ -42,7 +42,7 @@ Il controllo del boost attiva una saturazione semplice. Per il suono di un vero 
 
 ## Cosa manca ancora
 
-- Build Mac verificata su hardware e Scarlett, firma/notarizzazione Apple.
+- Prova audio sul tuo Mac con la Scarlett, verifica nella DAW, firma/notarizzazione Apple.
 - Ricerca TONE3000 interna: il pulsante apre il sito nel browser, poi carichi i file scaricati.
 - MIDI learn e tap tempo: la prima versione ha associazioni CC fisse, descritte nel README.
 - Cambio preset/catture senza discontinuità; è meglio caricarle tra una frase e l'altra.

@@ -5,7 +5,9 @@ See `CHANGELOG.md` for the 0.1.1 maintenance fixes.
 
 Original interface and signal-chain implementation, inspired by the idea of a compact amp-and-pedals workspace. Not affiliated with NamRay, Neural Amp Modeler or TONE3000.
 
-**Development version.** Mac and Windows binaries are not included in this source package. Build on your Mac using the included script, or run the repository's Native builds workflow in GitHub Actions. Only claim a platform as verified when its build and tests have actually run; see `VALIDATION.md`.
+**Development version 0.1.1.** Ready-to-run packages are published in [GitHub Actions](https://github.com/MassimoDanieli/lowline/actions/runs/39127864528): Mac universal (Apple Silicon + Intel), Windows x64 and Linux x64. The source ZIP itself contains no binaries. To compile locally, use the included scripts. Build and software tests have run on all three platforms; see `VALIDATION.md` for the limits of that verification.
+
+![Lowline interface](preview.png)
 
 ## What it does
 
@@ -51,7 +53,9 @@ Set hardware gain so normal playing stays below clipping, then adjust Lowline in
 
 ## Download builds from GitHub Actions
 
-Open the repository's **Actions** tab, select a successful **Native builds** run, and download its **Lowline-macOS-universal**, **Lowline-Windows-x64** or **Lowline-Linux-x64** artifact. The outer artifact ZIP contains a platform archive; unpack that archive to find the standalone app and plugins. The Mac archive preserves bundle permissions and is checked for both arm64 and x86_64. It is not Developer-ID signed or notarised. A successful CI test is not a Scarlett or listening test. Artifacts are retained for 30 days.
+Open the repository's **Actions** tab, select a successful **Native builds** run, and download its **Lowline-macOS-universal**, **Lowline-Windows-x64** or **Lowline-Linux-x64** artifact. Direct packages for the verified 0.1.1 build: [Mac universal](https://github.com/MassimoDanieli/lowline/actions/runs/39127864528/artifacts/12136713681), [Windows x64](https://github.com/MassimoDanieli/lowline/actions/runs/39127864528/artifacts/12136892733), [Linux x64](https://github.com/MassimoDanieli/lowline/actions/runs/39127864528/artifacts/12137256442).
+
+The outer artifact ZIP contains a platform archive; unpack that archive to find the standalone app and plugins. The Mac archive preserves bundle permissions and is checked for both arm64 and x86_64. It is not Developer-ID signed or notarised. A successful CI test is not a Scarlett or listening test. Artifacts are retained for 30 days.
 
 ## Other platforms
 
