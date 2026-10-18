@@ -1,4 +1,5 @@
 #include "../Source/Processor.h"
+#include "../Source/Help.h"
 #include <iostream>
 #include <stdexcept>
 using namespace juce;
@@ -281,6 +282,26 @@ int main(int argc, char **argv)
         preview.prepareToPlay(48000, 256);
         std::unique_ptr<AudioProcessorEditor> e(preview.createEditor());
         require(e->getWidth() == 1180 && e->getHeight() == 830, "native editor opens with all controls");
+        auto *helpButton = dynamic_cast<TextButton *>(e->findChildWithID("lowline-help"));
+        require(helpButton != nullptr && bool(helpButton->onClick), "editor exposes its help action");
+        LowlineHelpContent help(true);
+        require(help.getTopicCount() == 12 && help.getDisplayedText().containsChar(0x00e8),
+                "Italian offline guide contains twelve topics and decoded UTF-8 text");
+        for (int topic = 0; topic < 12; ++topic)
+        {
+            help.selectTopic(topic);
+            require(help.getDisplayedText().length() > 400, "Italian help topic contains instructions");
+        }
+        help.setLanguage(false);
+        require(help.getTopicCount() == 12 && help.getDisplayedText().contains("Troubleshooting"),
+                "English guide switches language and preserves the selected topic");
+        for (int topic = 0; topic < 12; ++topic)
+        {
+            help.selectTopic(topic);
+            require(help.getDisplayedText().length() > 400, "English help topic contains instructions");
+        }
+        help.setLanguage(true);
+        help.selectTopic(0);
         if (argc > 1 && String(argv[1]) == "--screenshot")
         {
             e->setVisible(true);
@@ -292,6 +313,11 @@ int main(int argc, char **argv)
             PNGImageFormat fmt;
             fmt.writeImageToStream(img, out);
             std::cout << png.getFullPathName() << "\n";
+            File helpPng = File::getCurrentWorkingDirectory().getChildFile("lowline-help-preview.png");
+            FileOutputStream helpOut(helpPng);
+            helpOut.setPosition(0);
+            helpOut.truncate();
+            fmt.writeImageToStream(help.createComponentSnapshot(help.getLocalBounds()), helpOut);
         }
         temp.deleteRecursively();
         std::cout << "All audio checks passed.\n";

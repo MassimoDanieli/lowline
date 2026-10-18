@@ -115,8 +115,16 @@ LowlineEditor::LowlineEditor(LowlineProcessor &p) : AudioProcessorEditor(p), pro
         addAndMakeVisible(loadButtons[i]);
         addAndMakeVisible(clearButtons[i]);
     }
-    for (auto *b : {&saveButton, &openButton, &toneButton, &languageButton})
+    for (auto *b : {&saveButton, &openButton, &toneButton, &languageButton, &helpButton})
         addAndMakeVisible(*b);
+    helpButton.setComponentID("lowline-help");
+    helpButton.onClick = [this]
+    {
+        if (!helpWindow)
+            helpWindow = std::make_unique<LowlineHelpWindow>(proc.getLanguage() == "IT");
+        helpWindow->setVisible(true);
+        helpWindow->toFront(true);
+    };
     saveButton.onClick = [this] { preset(true); };
     openButton.onClick = [this] { preset(false); };
     toneButton.onClick = [] { URL("https://www.tone3000.com/").launchInDefaultBrowser(); };
@@ -159,6 +167,9 @@ void LowlineEditor::translate()
     saveButton.setButtonText(it ? "SALVA" : "SAVE");
     openButton.setButtonText(it ? "APRI" : "OPEN");
     languageButton.setButtonText(proc.getLanguage() + " / " + (it ? "EN" : "IT"));
+    helpButton.setButtonText(it ? "GUIDA" : "HELP");
+    if (helpWindow)
+        helpWindow->setLanguage(it);
     repaint();
 }
 void LowlineEditor::panel(Graphics &g, Rectangle<int> r, const String &title, Colour accent)
@@ -206,6 +217,7 @@ void LowlineEditor::resized()
 {
     subtitle.setBounds(26, 69, 650, 22);
     source.setBounds(740, 25, 180, 30);
+    helpButton.setBounds(628, 25, 96, 30);
     programs.setBounds(936, 25, 220, 30);
     saveButton.setBounds(740, 70, 86, 28);
     openButton.setBounds(834, 70, 78, 28);

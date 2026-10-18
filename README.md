@@ -9,6 +9,12 @@ Original interface and signal-chain implementation, inspired by the idea of a co
 
 ![Lowline interface](preview.png)
 
+## User guide / Guida utente
+
+Click **GUIDA / HELP** in the app or plugin for the built-in offline guide: twelve topics, an index and Italian/English switching. Closing the guide leaves the rig running.
+
+Read it online: [Italiano](docs/HELP_IT.md) · [English](docs/HELP_EN.md).
+
 ## What it does
 
 - Standalone app, VST3 plugin on macOS/Windows/Linux; AU on macOS.

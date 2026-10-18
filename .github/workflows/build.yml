@@ -52,7 +52,9 @@ jobs:
           name: Lowline-interface-preview
           if-no-files-found: error
           retention-days: 30
-          path: lowline-preview.png
+          path: |
+            lowline-preview.png
+            lowline-help-preview.png
       - name: Verify Mac architectures and package
         if: runner.os == 'macOS'
         run: |

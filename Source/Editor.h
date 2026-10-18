@@ -1,5 +1,6 @@
 #pragma once
 #include "Processor.h"
+#include "Help.h"
 class LowlineLook : public juce::LookAndFeel_V4
 {
   public:
@@ -47,9 +48,10 @@ class LowlineEditor : public juce::AudioProcessorEditor,
     std::map<juce::String, std::unique_ptr<Toggle>> toggles;
     std::array<juce::TextButton, 4> loadButtons, clearButtons;
     juce::TextButton saveButton{"SAVE"}, openButton{"OPEN"}, toneButton{"TONE3000 "},
-        languageButton{"IT / EN"};
+        languageButton{"IT / EN"}, helpButton{"GUIDA"};
     juce::ComboBox source, programs;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> sourceLink;
     juce::Label statusLabel, subtitle, meterLabel;
     std::unique_ptr<juce::FileChooser> chooser;
+    std::unique_ptr<LowlineHelpWindow> helpWindow;
 };

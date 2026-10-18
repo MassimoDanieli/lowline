@@ -24,3 +24,9 @@ Loading uses a short protected object swap with a nonblocking direct fallback if
 
 - Sfondo antracite, accenti smeraldo e ambra piu vividi, testi piu leggibili.
 - Maggiore contrasto tra pulsanti attivi, spenti e al passaggio del mouse.
+
+### Guida bilingue integrata
+
+- Pulsante GUIDA / HELP nell'app e nei plugin, con finestra ridimensionabile e indice di dodici argomenti.
+- Manuali offline in italiano e inglese: prima configurazione, controlli, NAM/IR, preset, MIDI, plugin e risoluzione dei problemi.
+- I manuali online in docs/ sono anche le risorse incorporate nell'app.
