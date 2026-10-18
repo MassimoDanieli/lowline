@@ -23,7 +23,7 @@ Existing regression checks remain: compression, ping-pong repeats, disabled-dela
 
 The Native builds workflow compiles and runs the suite on Linux x64, Windows x64 and macOS. Mac binaries contain arm64 and x86_64 slices; tests execute on the runner's architecture. The workflow checks the standalone universal architectures before packaging Standalone, VST3 and AU.
 
-A verified run and direct package links are recorded in README once the run completes. CI output includes regression logs and native UI previews.
+Verified source commit: `9efdb3be8156738f816bcf9968ae0ffc5d46eafc`. [Native builds run 39152945390](https://github.com/MassimoDanieli/lowline/actions/runs/39152945390) completed successfully on all three platforms: macOS universal, Windows x64 and Linux x64. Each job compiled and ran the regression suite. Direct package links are in README; CI artifacts also include regression logs and native UI previews.
 
 ## Practical limits
 

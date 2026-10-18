@@ -24,6 +24,14 @@ The rig also includes compression, saturation booster, NAM pedal and amp slots, 
 
 ## Download and quick start
 
+Verified **0.2.0** packages ([successful build and tests](https://github.com/MassimoDanieli/lowline/actions/runs/39152945390)):
+
+- [Download macOS universal — Apple Silicon + Intel](https://github.com/MassimoDanieli/lowline/actions/runs/39152945390/artifacts/12146091435)
+- [Download Windows x64](https://github.com/MassimoDanieli/lowline/actions/runs/39152945390/artifacts/12146150976)
+- [Download Linux x64](https://github.com/MassimoDanieli/lowline/actions/runs/39152945390/artifacts/12145338897)
+
+GitHub sign-in may be required to download artifacts.
+
 Native packages are built in [GitHub Actions](https://github.com/MassimoDanieli/lowline/actions). Choose a successful **Native builds** run and download **Lowline-macOS-universal**, **Lowline-Windows-x64** or **Lowline-Linux-x64** under Artifacts. Unpack the outer artifact ZIP, then the platform archive inside. Artifacts expire after 30 days.
 
 On Mac, run the standalone app or install the AU/VST3 bundle in your user's Audio/Plug-Ins folders. The app is not Developer-ID signed or notarised. See the guide for installation and audio setup.
