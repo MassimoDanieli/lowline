@@ -73,6 +73,10 @@ void wait(LowlineProcessor &p)
 int main(int argc, char **argv)
 {
     ScopedJuceInitialiser_GUI gui;
+    // Never touch the developer's real controller settings.
+    auto settingsFolder = File::getSpecialLocation(File::tempDirectory).getChildFile("lowline-test-settings");
+    settingsFolder.deleteRecursively();
+    LowlineProcessor::settingsOverride() = settingsFolder;
     try
     {
         lowline::Compressor c;
@@ -336,6 +340,7 @@ int main(int argc, char **argv)
         MidiBuffer learn;
         learn.addEvent(MidiMessage::controllerEvent(2, 45, 127), 0);
         portableSource.processBlock(b, learn);
+        portableSource.handleUpdateNowIfNeeded(); // learn is saved on the message thread
         require(portableSource.midiDescription().contains("CC 45") && !portableSource.midiDescription().contains("CC 11 "),
                 "MIDI learn replaces the target assignment and accepts another channel");
         auto portablePreset = temp.getChildFile("portable.lowline");
@@ -349,7 +354,7 @@ int main(int argc, char **argv)
                 "portable preset restores models and IRs without original paths");
         settle(restored, b, .2f);
         require(std::abs(b.getSample(0, 255) - .1f) < .002f, "portable NAM still produces the expected output");
-        require(restored.midiDescription().contains("CC 45"), "MIDI learn survives preset export and restore");
+        require(restored.midiDescription().contains("CC 45"), "MIDI learn is global: a new instance uses it");
         MidiBuffer expression;
         expression.addEvent(MidiMessage::controllerEvent(1, 45, 0), 0);
         restored.processBlock(b, expression);
@@ -725,7 +730,7 @@ int main(int argc, char **argv)
             require(worst < .06f, "reloading the same preset keeps the amp playing (no raw DI gap)");
 
             set(r, "compOn", 0);
-            r.momentarySwitches = true;
+            r.setMomentarySwitches(true);
             auto footswitch = [&](int value)
             {
                 MidiBuffer event; // processBlock consumes the buffer
@@ -736,10 +741,30 @@ int main(int argc, char **argv)
             require(r.state.getRawParameterValue("compOn")->load() > .5f, "momentary footswitch: press turns on, release keeps it");
             footswitch(127); footswitch(0);
             require(r.state.getRawParameterValue("compOn")->load() < .5f, "momentary footswitch: second press turns off");
-            MemoryBlock withMode; r.getStateInformation(withMode);
-            LowlineProcessor r2; r2.setStateInformation(withMode.getData(), int(withMode.getSize()));
-            require(r2.momentarySwitches.load(), "footswitch mode is saved with the MIDI map");
-            r.momentarySwitches = false;
+            LowlineProcessor r2;
+            require(r2.momentarySwitches.load(), "footswitch mode is saved with the global MIDI settings");
+            r.setMomentarySwitches(false);
+            {
+                // Presets never carry or change the controller settings.
+                MemoryBlock preset; r.getStateInformation(preset);
+                auto xml = AudioProcessor::getXmlFromBinary(preset.getData(), int(preset.getSize()));
+                require(xml && xml->getChildByName("MidiMappings") == nullptr && xml->getChildByName("ProgramFiles") == nullptr,
+                        "presets no longer embed the MIDI map or the PC bank");
+                auto foreign = ValueTree::fromXml(*xml);
+                ValueTree map("MidiMappings"); map.setProperty("cc20", -1, nullptr); map.setProperty("cc99", 3, nullptr);
+                foreign.addChild(map, -1, nullptr);
+                MemoryBlock foreignBytes; AudioProcessor::copyXmlToBinary(*foreign.createXml(), foreignBytes);
+                r.setStateInformation(foreignBytes.getData(), int(foreignBytes.getSize())); wait(r);
+                require(r.midiDescription().contains("CC 20") && !r.midiDescription().contains("CC 99"),
+                        "opening someone else's preset keeps your MIDI map");
+                // Upgrade: with no global settings yet, the map of an old session is adopted once.
+                LowlineProcessor::midiSettingsFile().deleteFile();
+                LowlineProcessor upgraded;
+                upgraded.setStateInformation(foreignBytes.getData(), int(foreignBytes.getSize())); wait(upgraded);
+                require(upgraded.midiDescription().contains("CC 99") && LowlineProcessor::midiSettingsFile().existsAsFile(),
+                        "a 0.3 session's MIDI map is adopted once as the global map");
+                upgraded.resetMidiMappings();
+            }
 
             set(r, "sync", 0);
             // Explicit timestamps: CI runners (macOS especially) oversleep, so sleep-based taps are flaky.

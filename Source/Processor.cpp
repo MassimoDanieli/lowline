@@ -73,7 +73,8 @@ LowlineProcessor::LowlineProcessor()
     for (auto *parameter : getParameters()) parameter->addListener(this);
     for (auto *parameter : getParameters())
         if (auto *ranged = dynamic_cast<RangedAudioParameter *>(parameter)) midiTargets.push_back(ranged);
-    resetMidiMappings();
+    defaultMidiMappings();
+    loadMidiSettings();
     worker = std::thread([this] { workerLoop(); });
     markClean();
 }
@@ -138,6 +139,11 @@ void LowlineProcessor::set(const char *id, float v)
 }
 void LowlineProcessor::resetMidiMappings()
 {
+    defaultMidiMappings();
+    saveMidiSettings();
+}
+void LowlineProcessor::defaultMidiMappings()
+{
     for (auto &mapping : midiMap) mapping = -1;
     const char *ids[] = {"compOn", "driveOn", "pedalOn", "ampOn", "cabOn", "delayOn", "reverbOn", "bypass"};
     for (size_t i = 0; i < midiTargets.size(); ++i)
@@ -154,6 +160,89 @@ void LowlineProcessor::clearMidiTarget(int target)
     for (auto &mapping : midiMap)
         if (mapping.load() == target || (mapping.load() == -2 && target >= 0 && target < int(midiTargets.size()) && midiTargets[size_t(target)]->paramID == "output")) mapping = -1;
     learnTarget = -1;
+    saveMidiSettings();
+}
+File &LowlineProcessor::settingsOverride()
+{
+    static File override;
+    return override;
+}
+File LowlineProcessor::midiSettingsFile()
+{
+    const auto folder = settingsOverride() != File{} ? settingsOverride()
+        : File::getSpecialLocation(File::userApplicationDataDirectory).getChildFile("Lowline");
+    return folder.getChildFile("midi-controller.xml");
+}
+ValueTree LowlineProcessor::midiSettingsTree() const
+{
+    ValueTree root("LowlineMidi");
+    ValueTree mappings("MidiMappings");
+    for (int cc = 0; cc < 128; ++cc) mappings.setProperty("cc" + String(cc), midiMap[size_t(cc)].load(), nullptr);
+    mappings.setProperty("momentary", momentarySwitches.load(), nullptr);
+    root.addChild(mappings, -1, nullptr);
+    ValueTree bank("ProgramFiles");
+    {
+        std::lock_guard guard(metadataMutex);
+        for (int pc = 0; pc < 128; ++pc)
+            if (programFiles[size_t(pc)].isNotEmpty()) bank.setProperty("pc" + String(pc), programFiles[size_t(pc)], nullptr);
+    }
+    root.addChild(bank, -1, nullptr);
+    return root;
+}
+void LowlineProcessor::applyMidiSettings(const ValueTree &tree)
+{
+    auto mappings = tree.getChildWithName("MidiMappings");
+    if (mappings.isValid())
+    {
+        for (int cc = 0; cc < 128; ++cc)
+        {
+            const int target = int(mappings.getProperty("cc" + String(cc), -1));
+            midiMap[size_t(cc)] = target >= -2 && target <= int(midiTargets.size()) ? target : -1;
+        }
+        momentarySwitches = bool(mappings.getProperty("momentary", false));
+    }
+    auto bank = tree.getChildWithName("ProgramFiles");
+    if (bank.isValid())
+    {
+        std::lock_guard guard(metadataMutex);
+        for (int pc = 0; pc < 128; ++pc)
+        {
+            programFiles[size_t(pc)] = bank.getProperty("pc" + String(pc)).toString();
+            programAssigned[size_t(pc)] = programFiles[size_t(pc)].isNotEmpty();
+        }
+    }
+}
+void LowlineProcessor::loadMidiSettings()
+{
+    // The MIDI map and the Program Change bank belong to the player's controller, not to a sound:
+    // one file shared by the app and every plugin instance.
+    const auto file = midiSettingsFile();
+    hasMidiSettings = file.existsAsFile();
+    if (!hasMidiSettings) return;
+    if (auto xml = XmlDocument::parse(file); xml && xml->hasTagName("LowlineMidi"))
+        applyMidiSettings(ValueTree::fromXml(*xml));
+}
+void LowlineProcessor::saveMidiSettings()
+{
+    if (!MessageManager::existsAndIsCurrentThread())
+    {
+        midiSettingsDirty = true;
+        triggerAsyncUpdate();
+        return;
+    }
+    midiSettingsDirty = false;
+    const auto file = midiSettingsFile();
+    if (file.getParentDirectory().createDirectory().failed()) return;
+    if (auto xml = midiSettingsTree().createXml())
+    {
+        TemporaryFile temporary(file);
+        if (xml->writeTo(temporary.getFile()) && temporary.overwriteTargetFileWithTemporary()) hasMidiSettings = true;
+    }
+}
+void LowlineProcessor::setMomentarySwitches(bool on)
+{
+    momentarySwitches = on;
+    saveMidiSettings();
 }
 StringArray LowlineProcessor::midiTargetNames() const
 {
@@ -202,9 +291,12 @@ void LowlineProcessor::tapTempoAt(double now)
 void LowlineProcessor::assignProgram(int pc, const File &file)
 {
     if (pc < 0 || pc > 127) return;
+    {
     std::lock_guard lock(metadataMutex);
     programFiles[size_t(pc)] = file == File{} ? String() : file.getFullPathName();
     programAssigned[size_t(pc)] = file != File{};
+    }
+    saveMidiSettings();
 }
 String LowlineProcessor::programAssignment(int pc) const
 {
@@ -230,6 +322,7 @@ void LowlineProcessor::midi(const MidiBuffer &m)
             for (auto &mapping : midiMap)
                 if (mapping.load() == learning || (mapping.load() == -2 && learning < int(midiTargets.size()) && midiTargets[size_t(learning)]->paramID == "output")) mapping = -1;
             midiMap[size_t(cc)] = learning;
+            saveMidiSettings(); // deferred to the message thread
         }
         const int target = midiMap[size_t(cc)];
         const bool high = value >= 64;
@@ -506,7 +599,7 @@ void LowlineProcessor::workerLoop()
                 {
                     const String path = programAssignment(pc);
                     MemoryBlock bytes;
-                    if (path.isNotEmpty() && buildPreset(File(path), true, bytes))
+                    if (path.isNotEmpty() && buildPreset(File(path), bytes))
                     {
                         { std::lock_guard g(presetMutex); pendingPreset = std::move(bytes); }
                         triggerAsyncUpdate();
@@ -696,20 +789,10 @@ void LowlineProcessor::getStateInformation(MemoryBlock &dest)
         for (int i = 0; i < 4; ++i)
             tree.setProperty("file" + String(i), paths[i], nullptr);
     }
-    ValueTree mappings("MidiMappings");
-    for (int cc = 0; cc < 128; ++cc) mappings.setProperty("cc" + String(cc), midiMap[size_t(cc)].load(), nullptr);
-    mappings.setProperty("momentary", momentarySwitches.load(), nullptr);
+    // MIDI map and Program Change bank are global (see loadMidiSettings), not part of a sound.
     tree.removeChild(tree.getChildWithName("MidiMappings"), nullptr);
-    tree.addChild(mappings, -1, nullptr);
-    ValueTree bank("ProgramFiles");
-    {
-        std::lock_guard guard(metadataMutex);
-        for (int pc = 0; pc < 128; ++pc)
-            if (programFiles[size_t(pc)].isNotEmpty()) bank.setProperty("pc" + String(pc), programFiles[size_t(pc)], nullptr);
-    }
     tree.removeChild(tree.getChildWithName("ProgramFiles"), nullptr);
-    tree.addChild(bank, -1, nullptr);
-    tree.setProperty("schema", 2, nullptr);
+    tree.setProperty("schema", 3, nullptr);
     tree.setProperty("language", getLanguage(), nullptr);
     tree.setProperty("program", program.load(), nullptr);
     auto xml = tree.createXml();
@@ -740,24 +823,12 @@ void LowlineProcessor::restoreState(const void *data, int size, bool keepUndo)
         if (MessageManager::existsAndIsCurrentThread()) undo.clearUndoHistory();
         else { clearUndoPending = true; triggerAsyncUpdate(); }
     }
-    resetMidiMappings();
-    auto mappings = tree.getChildWithName("MidiMappings");
-    if (mappings.isValid())
-        for (int cc = 0; cc < 128; ++cc)
-        {
-            const int target = int(mappings.getProperty("cc" + String(cc), -1));
-            midiMap[size_t(cc)] = target >= -2 && target <= int(midiTargets.size()) ? target : -1;
-        }
-    momentarySwitches = mappings.isValid() && bool(mappings.getProperty("momentary", false));
-    auto bank = tree.getChildWithName("ProgramFiles");
-    if (bank.isValid())
+    // Older presets and sessions carry a MIDI map: it is adopted once, only while no global
+    // controller settings exist yet (upgrade from 0.3). Afterwards presets never change it.
+    if (!hasMidiSettings && (tree.getChildWithName("MidiMappings").isValid() || tree.getChildWithName("ProgramFiles").isValid()))
     {
-        std::lock_guard guard(metadataMutex);
-        for (int pc = 0; pc < 128; ++pc)
-        {
-            programFiles[size_t(pc)] = bank.getProperty("pc" + String(pc)).toString();
-            programAssigned[size_t(pc)] = programFiles[size_t(pc)].isNotEmpty();
-        }
+        applyMidiSettings(tree);
+        saveMidiSettings();
     }
     setLanguage(tree.getProperty("language", "IT").toString());
     program = jlimit(0, 3, int(tree.getProperty("program", 0)));
@@ -810,7 +881,7 @@ void LowlineProcessor::savePreset(const File &f, bool portable)
     else
     { markClean(); setStatus("Preset saved / Salvato"); }
 }
-bool LowlineProcessor::buildPreset(const File &f, bool preserveMidi, MemoryBlock &out)
+bool LowlineProcessor::buildPreset(const File &f, MemoryBlock &out)
 {
     MemoryBlock b;
     if (f.getSize() > 300LL * 1024 * 1024 || !f.loadFileAsData(b))
@@ -853,24 +924,13 @@ bool LowlineProcessor::buildPreset(const File &f, bool preserveMidi, MemoryBlock
         tree.removeProperty("asset" + String(slot), nullptr);
         tree.removeProperty("ext" + String(slot), nullptr);
     }
-    if (preserveMidi)
-    {
-        MemoryBlock current; getStateInformation(current);
-        auto currentXml = getXmlFromBinary(current.getData(), int(current.getSize()));
-        auto currentTree = ValueTree::fromXml(*currentXml);
-        for (const auto *name : {"MidiMappings", "ProgramFiles"})
-        {
-            tree.removeChild(tree.getChildWithName(name), nullptr);
-            tree.addChild(currentTree.getChildWithName(name).createCopy(), -1, nullptr);
-        }
-    }
     auto extracted = tree.createXml(); out.reset(); copyXmlToBinary(*extracted, out);
     return true;
 }
-void LowlineProcessor::openPreset(const File &f, bool preserveMidi)
+void LowlineProcessor::openPreset(const File &f)
 {
     MemoryBlock bytes;
-    if (!buildPreset(f, preserveMidi, bytes)) return;
+    if (!buildPreset(f, bytes)) return;
     setStateInformation(bytes.getData(), (int)bytes.getSize());
     cleanWhenReady = true;
     // Loader errors must remain visible instead of being overwritten by a success message.
@@ -878,6 +938,7 @@ void LowlineProcessor::openPreset(const File &f, bool preserveMidi)
 void LowlineProcessor::handleAsyncUpdate()
 {
     if (clearUndoPending.exchange(false)) undo.clearUndoHistory();
+    if (midiSettingsDirty) saveMidiSettings();
     if (const int named = programNamePending.exchange(-1); named >= 0)
         state.state.setProperty("presetName", getProgramName(named), nullptr);
     MemoryBlock bytes;

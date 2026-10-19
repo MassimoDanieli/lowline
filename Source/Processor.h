@@ -94,7 +94,11 @@ class LowlineProcessor : public juce::AudioProcessor,
     std::array<std::atomic<bool>, 2> normalisationAvailable{};
     std::array<std::atomic<float>, 2> modelLoudness{};
     LowlineTuner tuner;
-    void openPreset(const juce::File &, bool preserveMidi = false);
+    void openPreset(const juce::File &);
+    // MIDI map, footswitch mode and Program Change bank: one global file for the controller.
+    static juce::File &settingsOverride(); // tests point this at a temporary folder
+    static juce::File midiSettingsFile();
+    void setMomentarySwitches(bool);
     // Program Change presets are read on the worker and applied here, on the message thread
     // (APVTS replaceState also clears the UndoManager, which is not thread-safe).
     void handleAsyncUpdate() override;
@@ -113,7 +117,13 @@ class LowlineProcessor : public juce::AudioProcessor,
 
     void processChunk(juce::AudioBuffer<float> &, int, int);
     void limitOutput(juce::AudioBuffer<float> &, bool allowMute = true);
-    bool buildPreset(const juce::File &, bool preserveMidi, juce::MemoryBlock &);
+    bool buildPreset(const juce::File &, juce::MemoryBlock &);
+    void defaultMidiMappings();
+    void loadMidiSettings();
+    void saveMidiSettings();
+    juce::ValueTree midiSettingsTree() const;
+    void applyMidiSettings(const juce::ValueTree &);
+    std::atomic<bool> hasMidiSettings{false}, midiSettingsDirty{false};
     std::mutex presetMutex;
     juce::MemoryBlock pendingPreset;
     void setStatus(const juce::String &);

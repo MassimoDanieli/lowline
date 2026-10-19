@@ -154,7 +154,7 @@ LowlineEditor::LowlineEditor(LowlineProcessor &p) : AudioProcessorEditor(p), pro
     switchMode.addItem("Latching: 127 = on, 0 = off", 1);
     switchMode.addItem("Momentary: each press toggles", 2);
     switchMode.setSelectedId(proc.momentarySwitches ? 2 : 1, dontSendNotification);
-    switchMode.onChange = [this] { proc.momentarySwitches = switchMode.getSelectedId() == 2; };
+    switchMode.onChange = [this] { proc.setMomentarySwitches(switchMode.getSelectedId() == 2); };
     for (auto *box : {&division, &midiTarget, &midiProgram, &switchMode}) addAndMakeVisible(*box);
     division.addItemList({"1/16", "1/8", "1/8 dotted", "1/4", "1/4 dotted", "1/2"}, 1);
     divisionLink = std::make_unique<AudioProcessorValueTreeState::ComboBoxAttachment>(proc.state, "division", division);
@@ -432,8 +432,8 @@ void LowlineEditor::timerCallback()
     learnButton.setButtonText(proc.learnTarget >= 0 ? (it ? "MUOVI PEDALE..." : "MOVE PEDAL...") : "LEARN");
     const String assignment = proc.programAssignment(midiProgram.getSelectedId() - 1);
     assignmentLabel.setText((assignment.isEmpty() ? (it ? "Nessun preset assegnato." : "No preset assigned.") : assignment) +
-        String(it ? "\nPC 0-3: preset di fabbrica se non assegnati. SALVA conserva la mappa MIDI e gli abbinamenti."
-                  : "\nPC 0-3: factory presets when unassigned. SAVE retains MIDI mappings and assignments."), dontSendNotification);
+        String(it ? "\nPC 0-3: preset di fabbrica se non assegnati. Mappa MIDI e banco PC sono globali e si salvano da soli."
+                  : "\nPC 0-3: factory presets when unassigned. The MIDI map and PC bank are global and saved automatically."), dontSendNotification);
 }
 void LowlineEditor::choose(LowlineProcessor::Slot slot)
 {

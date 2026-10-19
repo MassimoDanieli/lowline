@@ -135,7 +135,7 @@ Senza una IR caricata, attivare REVERB ON non crea un riverbero. Il file determi
 La normalizzazione delle IR è gestita dal motore di convoluzione; non equivale a pareggiare automaticamente il volume dei modelli NAM. Il timing iniziale della IR viene conservato. Una IR lunga può richiedere più risorse: se senti interruzioni, prova una IR più corta o aumenta il buffer.
 
 ## 09 · Preset, file e trascinamento
-SALVA crea un preset .lowline leggero con controlli, lingua, mappature MIDI, abbinamenti Program Change e percorsi assoluti ai file NAM/IR. Le sessioni della DAW conservano lo stesso stato. APRI richiama sia preset normali sia portabili.
+SALVA crea un preset .lowline leggero con controlli, lingua e percorsi assoluti ai file NAM/IR. Mappa MIDI e banco Program Change non stanno nei preset: appartengono alla tua pedaliera (vedi MIDI). Le sessioni della DAW conservano lo stesso stato. APRI richiama sia preset normali sia portabili.
 
 ESPORTA crea un .lowline portabile che include copie dei modelli e delle IR caricate nei quattro slot. Il limite è 64 MB per asset e 192 MB totali; se manca un file o supera il limite, l'esportazione viene annullata. Attendi che Loading sia terminato prima di salvare. Incorpora e condividi soltanto asset che hai diritto di ridistribuire.
 
@@ -157,7 +157,7 @@ Nell'app autonoma abilita il controller nelle impostazioni Audio/MIDI. Nel plugi
 
 Program Change 0…3 richiama, nell'ordine, i quattro preset di fabbrica. Alcune pedaliere li mostrano come 1…4: controlla il messaggio realmente trasmesso. Nella scheda MIDI puoi assegnare un file .lowline a qualsiasi PC 0…127: scegli il numero, premi ASSEGNA PRESET e seleziona il file. CLEAR PC rimuove l'abbinamento. Un abbinamento personale prevale sul preset di fabbrica; i numeri senza abbinamento oltre 3 vengono ignorati. Il caricamento avviene nel worker, quindi include il tempo necessario a leggere e preparare i file.
 
-SALVA conserva la banca nel preset/sessione corrente. Un richiamo tramite PC mantiene la banca e il MIDI learn correnti, così il preset caricato non cancella i comandi della pedaliera. APRI manualmente ripristina invece le mappature salvate nel file.
+Mappa MIDI, modalità dei pulsanti e banco PC sono globali: si salvano da soli a ogni modifica in un unico file (Lowline/midi-controller.xml nella cartella dati utente) usato dall'app e da ogni istanza del plugin. Aprire un preset, anche ricevuto da altri, non li cambia mai. Alla prima apertura della 0.3.2 la mappa salvata nel tuo ultimo preset o sessione viene adottata una volta come punto di partenza.
 
 Control Change (CC):
 20 = compressore
@@ -173,7 +173,7 @@ Control Change (CC):
 
 Per CC 20…27: valori 0…63 spengono, 64…127 accendono. Configura un interruttore che alterni 0 e 127. Un pulsante momentaneo può tenere acceso l'effetto soltanto finché è premuto, secondo la sua programmazione.
 
-MIDI LEARN: scegli il parametro nel menu, premi LEARN e muovi il controllo della pedaliera. Il prossimo CC ricevuto viene associato al parametro; la precedente associazione di quel parametro viene rimossa. CANCEL annulla l'attesa, CLEAR rimuove l'associazione del parametro selezionato e RESET ripristina la mappa iniziale riportata sopra. La lista mostra i CC assegnati. Il menu accanto alle istruzioni sceglie come i CC comandano gli interruttori (ON/OFF): Latching = 127 acceso / 0 spento (pedaliere che inviano lo stato), Momentary = ogni pressione inverte lo stato (pulsanti che inviano 127 alla pressione e 0 al rilascio). L'impostazione è salvata con la mappa MIDI.
+MIDI LEARN: scegli il parametro nel menu, premi LEARN e muovi il controllo della pedaliera. Il prossimo CC ricevuto viene associato al parametro; la precedente associazione di quel parametro viene rimossa. CANCEL annulla l'attesa, CLEAR rimuove l'associazione del parametro selezionato e RESET ripristina la mappa iniziale riportata sopra. La lista mostra i CC assegnati. Il menu accanto alle istruzioni sceglie come i CC comandano gli interruttori (ON/OFF): Latching = 127 acceso / 0 spento (pedaliere che inviano lo stato), Momentary = ogni pressione inverte lo stato (pulsanti che inviano 127 alla pressione e 0 al rilascio). L'impostazione è globale, come la mappa.
 
 I controlli continui usano l'intervallo completo del parametro con valori 0…127; quindi OUTPUT appreso via learn raggiunge +12 dB, mentre il CC 7 predefinito mantiene il limite storico di +6 dB. I pulsanti usano 0…63 spento e 64…127 acceso. Tap tempo reagisce al passaggio dal valore basso a quello alto: la pedaliera deve inviare anche il rilascio.
 
@@ -222,7 +222,7 @@ Il campo accanto a TAG VOCE assegna tag alla voce selezionata. I tag del catalog
 A destra puoi modificare nome, tag e descrizione del preset CORRENTE. Premi APPLICA DATI PRESET, poi SALVA o ESPORTA nel rig. Questi dati accompagnano il file .lowline. ANNULLA/RIPRISTINA agisce su ciò che fai nell'interfaccia: manopole, pulsanti, menu, preset di fabbrica, richiami A/B e dati editoriali. I cambiamenti da MIDI, automazione della DAW e TAP non entrano nella cronologia; non annulla il caricamento dei file, la registrazione o le operazioni del catalogo. Ogni gesto (un trascinamento, un clic) è un passo. La cronologia è temporanea e riparte all'apertura di un preset. L'asterisco nella pagina PALCO indica modifiche rispetto all'ultimo salvataggio/apertura; i controlli dello studio e la compensazione A/B sono temporanei e non fanno parte di quel preset.
 
 ## 14 · Confronto A/B e volume misurato
-AREA STUDIO → CONFRONTO A/B conserva due istantanee temporanee di controlli, mappa MIDI e percorsi delle quattro catture. MEMORIZZA A/B sostituisce la rispettiva istantanea; ASCOLTA A/B la richiama. Attendi il caricamento dei modelli. Le istantanee non contengono i file e non sopravvivono alla chiusura dell'istanza: usa SALVA per conservarle. Non sono due rig elaborati continuamente in parallelo.
+AREA STUDIO → CONFRONTO A/B conserva due istantanee temporanee di controlli e percorsi delle quattro catture. MEMORIZZA A/B sostituisce la rispettiva istantanea; ASCOLTA A/B la richiama. Attendi il caricamento dei modelli. Le istantanee non contengono i file e non sopravvivono alla chiusura dell'istanza: usa SALVA per conservarle. Non sono due rig elaborati continuamente in parallelo.
 
 Per confrontare il volume: imposta il suono A, premi MEMORIZZA A e suona una frase rappresentativa per 5 secondi: se il suono non era appena stato misurato, la misura parte da sola e viene attribuita ad A (se cambi qualcosa durante la misura, viene scartata). Ripeti con B. Dopo ogni richiamo la misura riparte automaticamente a caricamento finito: risuona la stessa frase e scegli ALLINEA AD A/B. ALLINEA rifiuta una misura vecchia o fatta su un altro suono. Il richiamo A/B non cancella la cronologia ANNULLA ed è a sua volta annullabile. Usa lo stesso basso, gain e frase: una diversa esecuzione altera il risultato. Il numero RMS è misurato sul canale sinistro del basso elaborato, prima della compensazione, della base, del metronomo e del limiter finale.
 

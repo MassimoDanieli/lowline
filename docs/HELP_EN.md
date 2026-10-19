@@ -135,7 +135,7 @@ Enabling REVERB ON without a loaded IR does not create a reverb. The file determ
 IR normalisation is handled by the convolution engine; this does not automatically match NAM model loudness. The IR's initial timing is preserved. Longer IRs may use more resources: try a shorter IR or a larger buffer if playback breaks up.
 
 ## 09 · Presets, files and drag-and-drop
-SAVE creates a lightweight .lowline preset with controls, language, MIDI mappings, Program Change assignments and absolute NAM/IR file paths. DAW sessions retain the same state. OPEN reads both ordinary and portable presets.
+SAVE creates a lightweight .lowline preset with controls, language and absolute NAM/IR file paths. The MIDI map and the Program Change bank are not part of presets: they belong to your controller (see MIDI). DAW sessions retain the same state. OPEN reads both ordinary and portable presets.
 
 EXPORT creates a portable .lowline containing copies of the models and IRs loaded in all four slots. Limits are 64 MB per asset and 192 MB total; missing or oversized assets cancel export. Wait for Loading to finish before saving. Embed and share only assets you have permission to redistribute.
 
@@ -157,7 +157,7 @@ In the standalone app enable your controller in Audio/MIDI settings. For the plu
 
 Program Change 0…3 recalls the four factory presets in order. Some controllers display these as 1…4: check the actual transmitted message. In MIDI you can assign a .lowline file to any PC 0…127: choose the number, click ASSIGN PRESET and select the file. CLEAR PC removes an assignment. User assignments override factory presets; unassigned numbers above 3 are ignored. Files load on the worker, including the time needed to read and prepare assets.
 
-SAVE retains the bank in the current preset/session. PC recalls preserve current bank assignments and MIDI learn, so a loaded preset does not erase your foot-controller setup. Manual OPEN restores the mappings saved in that file.
+The MIDI map, footswitch mode and PC bank are global: every change is saved automatically to one file (Lowline/midi-controller.xml in the user data folder) shared by the app and every plugin instance. Opening a preset, even one from someone else, never changes them. On first use of 0.3.2 the map stored in your last preset or session is adopted once as the starting point.
 
 Control Change (CC):
 20 = compressor
@@ -173,7 +173,7 @@ Control Change (CC):
 
 For CC 20…27, values 0…63 switch off and 64…127 switch on. Configure a latching switch that alternates 0 and 127. A momentary switch may enable an effect only while held, depending on its programming.
 
-MIDI LEARN: choose a parameter, click LEARN and move the controller. The next received CC is assigned to that parameter; its previous assignment is removed. CANCEL stops listening, CLEAR removes the selected parameter's assignment and RESET restores the initial map above. The list shows assigned CCs. The menu next to the instructions sets how CCs drive switches (ON/OFF): Latching = 127 on / 0 off (controllers that send the state), Momentary = every press flips the switch (buttons sending 127 on press and 0 on release). The setting is saved with the MIDI map.
+MIDI LEARN: choose a parameter, click LEARN and move the controller. The next received CC is assigned to that parameter; its previous assignment is removed. CANCEL stops listening, CLEAR removes the selected parameter's assignment and RESET restores the initial map above. The list shows assigned CCs. The menu next to the instructions sets how CCs drive switches (ON/OFF): Latching = 127 on / 0 off (controllers that send the state), Momentary = every press flips the switch (buttons sending 127 on press and 0 on release). The setting is global, like the map.
 
 Continuous controls use the parameter's full range across values 0…127, so learned OUTPUT reaches +12 dB while default CC 7 keeps its original +6 dB ceiling. Buttons use 0…63 off and 64…127 on. Tap tempo triggers on a transition from low to high: the controller must also transmit release.
 
@@ -222,7 +222,7 @@ The field beside TAG ITEM assigns local tags to the selected entry. Catalogue ta
 The right-hand fields describe the CURRENT preset, not necessarily the selected row. Enter a name, tags and description, APPLY PRESET DETAILS, then SAVE or EXPORT in the rig. These details accompany the .lowline file. UNDO/REDO covers what you do in the interface: knobs, buttons, menus, factory programs, A/B recalls and editorial metadata. Changes from MIDI, DAW automation and TAP stay out of the history; asset loading, recording and catalogue operations are not undone. Each gesture (a drag, a click) is one step. History is temporary and restarts when a preset is opened. The asterisk in STAGE indicates changes since saving/opening; practice settings and A/B match gain are temporary and excluded from that preset.
 
 ## 14 · A/B comparison and measured levels
-WORKSPACE → COMPARE A/B holds two temporary snapshots of controls, MIDI mappings and the four capture paths. STORE A/B replaces that snapshot; RECALL A/B restores it. Wait for asset preparation. Snapshots neither embed files nor survive closing the instance: SAVE a preset to keep a sound. These are not two complete rigs processing continuously in parallel.
+WORKSPACE → COMPARE A/B holds two temporary snapshots of controls and the four capture paths. STORE A/B replaces that snapshot; RECALL A/B restores it. Wait for asset preparation. Snapshots neither embed files nor survive closing the instance: SAVE a preset to keep a sound. These are not two complete rigs processing continuously in parallel.
 
 To compare levels, configure A, press STORE A and play a representative phrase for 5 seconds: unless the sound was just measured, measuring starts by itself and the result is attached to A (it is discarded if something changes meanwhile). Repeat for B. After each recall measuring restarts automatically once loading has finished: play the same phrase and MATCH TO A/B. MATCH refuses a stale measurement or one of a different sound. A/B recalls keep the UNDO history and can be undone themselves. Use the same instrument, physical gain and musical material; performance differences influence the result. RMS is measured on the processed bass's left channel before match gain, backing, metronome and the final limiter.
 

@@ -85,13 +85,13 @@ The limiter targets sample peaks at ±0.98, is stereo-linked and reports its lat
 
 ## Presets and MIDI
 
-**SAVE** stores controls, MIDI maps, PC assignments and absolute asset paths. **EXPORT** embeds the four slots' assets (64 MB per file / 192 MB total). **OPEN** accepts either format. Portable assets are extracted to a persistent user-data cache; subsequent ordinary saves reference that cache. Export again to transfer them. Only redistribute assets for which you have permission. PC-assigned preset files are separate and are not recursively embedded.
+**SAVE** stores controls and absolute asset paths; the MIDI map and PC bank are global controller settings, saved automatically. **EXPORT** embeds the four slots' assets (64 MB per file / 192 MB total). **OPEN** accepts either format. Portable assets are extracted to a persistent user-data cache; subsequent ordinary saves reference that cache. Export again to transfer them. Only redistribute assets for which you have permission. PC-assigned preset files are separate and are not recursively embedded.
 
 MIDI learn: select a target on MIDI, click LEARN, move the controller. CLEAR removes that target's assignment; RESET restores defaults. Values 0–63 disable toggles and 64–127 enable them. Continuous controls span their full parameter range. Tap reacts to a rising edge; transmit release too. All MIDI channels are accepted.
 
 Default CCs: 20 compressor, 21 booster, 22 pedal, 23 amp, 24 cab, 25 delay, 26 reverb, 27 bypass, 11 blend, 7 output (−36 to +6 dB). Learned output uses the full −36 to +12 dB range. Calibrate expression pedals on the controller.
 
-PC 0–3 recalls factory starting configurations unless a user file is assigned. Any PC 0–127 can recall an assigned .lowline file on the background worker. These recalls retain the current MIDI map/bank; manual OPEN restores the saved map/bank. SAVE the bank in a preset or host session to retain it.
+PC 0–3 recalls factory starting configurations unless a user file is assigned. Any PC 0–127 can recall an assigned .lowline file on the background worker. The MIDI map and bank are global (one settings file for the app and all plugin instances): no preset, recalled or opened, ever changes them.
 
 Older presets load with neutral defaults for the new effects. Keep backups when moving between versions; 0.2 exports are not designed for older versions.
 
