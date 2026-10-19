@@ -107,6 +107,16 @@ ctest --test-dir build -C Release --output-on-failure
 
 Mac universal: add `'-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64'` at configuration. Windows: Visual Studio 2022 Desktop C++ and CMake. Linux: development packages for ALSA, X11/Xext/Xinerama/Xrandr/Xcursor, FreeType, Fontconfig and OpenGL; see the workflow. Headless tests can use Xvfb.
 
+### iPad / iPhone (app + AUv3)
+
+Xcode 16+ on a Mac. CI compiles the iOS app and AUv3 on every push (unsigned). To install through TestFlight with Xcode's automatic signing — sign in to Xcode with your Apple Developer account and create the app (`com.massimodanieli.lowline`) once in App Store Connect — run:
+
+```sh
+LOWLINE_TEAM_ID=XXXXXXXXXX scripts/ios-testflight.sh
+```
+
+On iOS, picked files are copied into the app's Documents ("On My iPad › Lowline"), presets and recordings are saved there, and the AUDIO button opens input/buffer settings. Landscape only; the interface is the iPad layout, scaled.
+
 ## Practical limits
 
 Crossfades replace abrupt engine swaps, but temporarily run two engines per transitioning slot. Phase differences and CPU overruns can still be audible. Preset engines are prepared as a group, but controls apply before preparation finishes: this is not an atomic scene switch. One previous room tail may continue; another switch, clearing the room or changing the mix can truncate/mask it. There is no automatic model sample-rate conversion.

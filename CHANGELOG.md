@@ -1,3 +1,11 @@
+# 0.4.0
+
+**iPad / iPhone**
+- Lowline builds for iOS as an app and an AUv3 (AUM, GarageBand, Loopy Pro, Cubasis), landscape, scaled iPad layout. CI compiles it on every push; `scripts/ios-testflight.sh` uploads a build to TestFlight with Xcode's automatic signing.
+- iOS file handling: picked files are copied into the app's Documents (visible in Files), presets are saved by name into Presets, recordings go straight into Recordings, and stored paths survive app updates (the app container moves).
+- AUDIO opens the audio/MIDI settings; the input stays un-muted once you un-muted it; BLUETOOTH MIDI pairs wireless pedals; the guide opens inside the interface (also in AUv3 hosts on the desktop).
+- App icon (also used by the Mac app).
+
 # 0.3.2
 
 Second review round. Every behaviour change has a regression test; CI now also runs pluginval (strictness 10) on all three systems and auval on macOS.

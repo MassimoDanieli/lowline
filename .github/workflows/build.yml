@@ -172,6 +172,28 @@ jobs:
             build/Testing/Temporary/*.log
             pluginval-logs/**
 
+  ios:
+    name: iOS (iPad/iPhone app + AUv3) compile check
+    timeout-minutes: 60
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure Xcode project for iOS
+        run: cmake -S . -B build-ios -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 -DLOWLINE_BUILD_NUMBER=${{ github.run_number }}
+      - name: Build app and AUv3 for devices (unsigned)
+        run: |
+          xcodebuild -quiet -project build-ios/Lowline.xcodeproj -target Lowline_AUv3 -target Lowline_Standalone \
+            -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO build
+      - name: Check the app bundle
+        run: |
+          set -euo pipefail
+          app=$(find build-ios -path '*Release-iphoneos*' -name 'Lowline.app' -type d | head -n 1)
+          test -n "$app"
+          echo "App: $app"
+          ls "$app/PlugIns"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Info.plist"
+          lipo -info "$app/Lowline"
+
   release:
     name: Publish downloads for the CMake version
     needs: build
