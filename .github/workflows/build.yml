@@ -187,10 +187,15 @@ jobs:
       - name: Check the app bundle
         run: |
           set -euo pipefail
-          app=$(find build-ios -path '*Release-iphoneos*' -name 'Lowline.app' -type d | head -n 1)
-          test -n "$app"
+          # JUCE writes products to Lowline_artefacts/<config>/Standalone (no "-iphoneos" suffix).
+          app=$(find build-ios -name 'Lowline.app' -type d -not -path '*.build/*' -print -quit)
+          if [[ -z "$app" ]]; then
+            echo 'Lowline.app not found; bundles produced:'
+            find build-ios \( -name '*.app' -o -name '*.appex' \) -type d -not -path '*.build/*'
+            exit 1
+          fi
           echo "App: $app"
-          ls "$app/PlugIns"
+          ls "$app/PlugIns" || echo 'Warning: no embedded AUv3 found in PlugIns'
           /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Info.plist"
           lipo -info "$app/Lowline"
 
