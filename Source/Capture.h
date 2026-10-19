@@ -13,6 +13,7 @@ struct LowlineCapture
     double tailSeconds = 0;
     uint64_t generation = 0;
     bool hasLoudness = false, compatible = true;
+    int prewarmSamples = 0;
     lowline::Slew normalGain;
     void prepare(double sr, int size)
     {
@@ -23,6 +24,7 @@ struct LowlineCapture
             compatible = expected < 0 || model->SupportsArbitrarySampleRate() || std::abs(expected - sr) < 1;
             if (compatible)
                 model->Reset(sr, size);
+            prewarmSamples = std::clamp(model->GetPrewarmSamples(), 0, int(sr * .25));
         }
         if (ir)
             ir->prepare({sr, (juce::uint32)size, 2});
@@ -95,6 +97,8 @@ class LowlineCaptureSlot
         enable.prepare(sr, 1);
         fadeRemaining = 0;
         tailRemaining = 0;
+        idle = false;
+        warmup = 0;
         const auto *waiting = pending.load();
         return (!active || active->compatible) && (!previous || previous->compatible) &&
                (!waiting || waiting->compatible);
@@ -129,6 +133,24 @@ class LowlineCaptureSlot
     {
         if (allowAdoption)
             beginChunk();
+        // Fully switched off: skip rendering, so an idle NAM model, a disabled reverb or an
+        // inaudible old room tail costs no CPU.
+        if (!enabled && fadeRemaining == 0 && enable.value < 1.e-4f)
+        {
+            enable.value = 0;
+            tailRemaining = 0;
+            idle = true;
+            return;
+        }
+        if (idle)
+        {
+            // Back from idle: drop the stale IR tail and let a NAM model refill its receptive
+            // field with current audio before it is faded in.
+            idle = false;
+            if (active && active->ir)
+                active->ir->reset();
+            warmup = active && active->model ? active->prewarmSamples : 0;
+        }
         auto render = [&](LowlineCapture *capture, juce::AudioBuffer<float> &destination) {
             if (capture)
                 capture->process(audio, destination, n, normalise, target);
@@ -143,7 +165,9 @@ class LowlineCaptureSlot
             render(previous, oldAudio);
         for (int i = 0; i < n; ++i)
         {
-            const float wet = enable.next(enabled ? 1.f : 0.f);
+            const float wet = enable.next(enabled && warmup == 0 ? 1.f : 0.f);
+            if (warmup > 0)
+                --warmup;
             const float mix = fadeRemaining > 0 ? 1.f - float(fadeRemaining--) / fadeLength : 1.f;
             const float tail =
                 tailRemaining > 0
@@ -167,5 +191,6 @@ class LowlineCaptureSlot
     juce::AudioBuffer<float> nextAudio, oldAudio, silence;
     lowline::Slew enable;
     double sampleRate = 48000;
-    int fadeRemaining = 0, fadeLength = 2400, tailRemaining = 0;
+    int fadeRemaining = 0, fadeLength = 2400, tailRemaining = 0, warmup = 0;
+    bool idle = false;
 };

@@ -86,6 +86,7 @@ LowlineProcessor::~LowlineProcessor()
     jobsReady.notify_one();
     if (worker.joinable())
         worker.join();
+    cancelPendingUpdate();
 }
 bool LowlineProcessor::isBusesLayoutSupported(const BusesLayout &l) const
 {
@@ -171,8 +172,27 @@ String LowlineProcessor::midiDescription() const
 void LowlineProcessor::tapTempo()
 {
     const double now = Time::getMillisecondCounterHiRes();
-    const double interval = now - lastTap.exchange(now);
-    if (interval >= 250 && interval <= 2000) set("tempo", float(60000 / interval));
+    float bpm = 0;
+    {
+        const SpinLock::ScopedLockType guard(tapLock);
+        const double interval = now - lastTap.exchange(now);
+        if (interval < 250 || interval > 2000) { tapCount = 0; return; }
+        const int n = std::min(tapCount, int(tapIntervals.size()));
+        double sum = 0;
+        for (int i = 0; i < n; ++i) sum += tapIntervals[size_t(i)];
+        // A tap far from the running average starts a new tempo instead of being averaged in.
+        if (n > 0 && std::abs(interval - sum / n) > .3 * sum / n) tapCount = 0;
+        tapIntervals[size_t(tapCount % int(tapIntervals.size()))] = interval;
+        ++tapCount;
+        const int used = std::min(tapCount, int(tapIntervals.size()));
+        sum = 0;
+        for (int i = 0; i < used; ++i) sum += tapIntervals[size_t(i)];
+        bpm = float(60000.0 * used / sum);
+    }
+    set("tempo", bpm);
+    // Without tempo sync TAP sets the delay time directly, like a delay pedal.
+    if (p("sync") < .5f)
+        set("time", std::clamp(lowline::tempoDelay(bpm, int(p("division"))), 30.f, 1500.f));
 }
 void LowlineProcessor::assignProgram(int pc, const File &file)
 {
@@ -214,7 +234,15 @@ void LowlineProcessor::midi(const MidiBuffer &m)
         }
         else if (target == -2) set("output", -36 + float(value) * 42 / 127);
         else if (target >= 0 && target < int(midiTargets.size()))
-            midiTargets[size_t(target)]->setValueNotifyingHost(float(value) / 127);
+        {
+            auto *parameter = midiTargets[size_t(target)];
+            if (momentarySwitches && dynamic_cast<AudioParameterBool *>(parameter) != nullptr)
+            {
+                if (high && !ccHigh[size_t(cc)]) parameter->setValueNotifyingHost(parameter->getValue() > .5f ? 0.f : 1.f);
+            }
+            else
+                parameter->setValueNotifyingHost(float(value) / 127);
+        }
         ccHigh[size_t(cc)] = high;
     }
 }
@@ -273,15 +301,16 @@ void LowlineProcessor::processBlockBypassed(AudioBuffer<float> &buffer, MidiBuff
     else if (getTotalNumInputChannels() == 1 && getTotalNumOutputChannels() > 1)
         buffer.copyFrom(1, 0, buffer, 0, 0, buffer.getNumSamples());
     // Preserve declared latency on host bypass, rather than moving the track by 1 ms.
-    limitOutput(buffer);
+    // Host bypass must never mute, even if the tuner mute was left on.
+    limitOutput(buffer, false);
 }
-void LowlineProcessor::limitOutput(AudioBuffer<float> &buffer)
+void LowlineProcessor::limitOutput(AudioBuffer<float> &buffer, bool allowMute)
 {
     for (int i = 0; i < buffer.getNumSamples(); ++i)
     {
         float l = buffer.getSample(0, i), r = getTotalNumOutputChannels() > 1 ? buffer.getSample(1, i) : l;
         limiter.tick(l, r);
-        const float mute = muteGain.next(p("tunerOn") && p("tunerMute") ? 0.f : 1.f);
+        const float mute = muteGain.next(allowMute && p("tunerOn") && p("tunerMute") ? 0.f : 1.f);
         l *= mute; r *= mute;
         if (limiter.gain < .999f)
             clipped = true;
@@ -370,7 +399,7 @@ void LowlineProcessor::processChunk(AudioBuffer<float> &out, int off, int n)
     }
     dry.copyFrom(0, 0, work, 0, 0, n);
     dry.copyFrom(1, 0, work, 1, 0, n);
-    captures[Room].process(work, n, true, false, 0, false);
+    captures[Room].process(work, n, !bypass && loaded[Room] && p("reverbOn") > .5f, false, 0, false);
     for (int i = 0; i < n; ++i)
     {
         float rm = reverbMix.next(!bypass && loaded[Room] && p("reverbOn") > .5f ? p("reverbMix") * .01f : 0);
@@ -437,7 +466,12 @@ void LowlineProcessor::workerLoop()
                 if (pc >= 0)
                 {
                     const String path = programAssignment(pc);
-                    if (path.isNotEmpty()) openPreset(File(path), true);
+                    MemoryBlock bytes;
+                    if (path.isNotEmpty() && buildPreset(File(path), true, bytes))
+                    {
+                        { std::lock_guard g(presetMutex); pendingPreset = std::move(bytes); }
+                        triggerAsyncUpdate();
+                    }
                 }
                 continue;
             }
@@ -450,11 +484,25 @@ void LowlineProcessor::workerLoop()
             {
                 const double sr = rate; const int bs = maxBlock;
                 std::array<std::unique_ptr<LowlineCapture>, 4> prepared;
-                for (int i = 0; i < 4; ++i) prepared[size_t(i)] = prepareCapture(Slot(i), job.files[size_t(i)], sr, bs);
+                {
+                    // A slot that already holds the same unmodified file keeps playing untouched:
+                    // no re-parse, no crossfade and no doubled room-tail rendering on PC / A-B switches.
+                    std::lock_guard g(metadataMutex);
+                    for (int i = 0; i < 4; ++i)
+                    {
+                        const auto &f = job.files[size_t(i)];
+                        const auto path = f == File{} ? String() : f.getFullPathName();
+                        job.keep[size_t(i)] = paths[size_t(i)] == path &&
+                            (path.isEmpty() || f.getLastModificationTime() == modified[size_t(i)]);
+                    }
+                }
+                for (int i = 0; i < 4; ++i)
+                    if (!job.keep[size_t(i)]) prepared[size_t(i)] = prepareCapture(Slot(i), job.files[size_t(i)], sr, bs);
                 const SpinLock::ScopedLockType setup(modelLock);
                 if (rate != sr || maxBlock != bs) throw std::runtime_error("Audio setup changed; recall preset again.");
                 const SpinLock::ScopedLockType publish(publicationLock);
-                for (int i = 0; i < 4; ++i) publishCapture(Slot(i), job.files[size_t(i)], std::move(prepared[size_t(i)]));
+                for (int i = 0; i < 4; ++i)
+                    if (!job.keep[size_t(i)]) publishCapture(Slot(i), job.files[size_t(i)], std::move(prepared[size_t(i)]));
                 if (job.warning.isNotEmpty()) throw std::runtime_error(job.warning.toStdString());
             }
             else performLoad(job.slot, job.file);
@@ -534,6 +582,7 @@ void LowlineProcessor::publishCapture(Slot slot, const File &file, std::unique_p
     {
         std::lock_guard g(metadataMutex);
         paths[slot] = file == File{} ? String() : file.getFullPathName();
+        modified[slot] = file == File{} ? Time() : file.getLastModificationTime();
         message = file == File{} ? "Slot cleared / Rimosso" : "Loaded / Caricato: " + file.getFileName();
     }
 }
@@ -591,6 +640,7 @@ void LowlineProcessor::getStateInformation(MemoryBlock &dest)
     }
     ValueTree mappings("MidiMappings");
     for (int cc = 0; cc < 128; ++cc) mappings.setProperty("cc" + String(cc), midiMap[size_t(cc)].load(), nullptr);
+    mappings.setProperty("momentary", momentarySwitches.load(), nullptr);
     tree.removeChild(tree.getChildWithName("MidiMappings"), nullptr);
     tree.addChild(mappings, -1, nullptr);
     ValueTree bank("ProgramFiles");
@@ -630,6 +680,7 @@ void LowlineProcessor::setStateInformation(const void *data, int size)
             const int target = int(mappings.getProperty("cc" + String(cc), -1));
             midiMap[size_t(cc)] = target >= -2 && target <= int(midiTargets.size()) ? target : -1;
         }
+    momentarySwitches = mappings.isValid() && bool(mappings.getProperty("momentary", false));
     auto bank = tree.getChildWithName("ProgramFiles");
     if (bank.isValid())
     {
@@ -691,19 +742,19 @@ void LowlineProcessor::savePreset(const File &f, bool portable)
     else
     { markClean(); setStatus("Preset saved / Salvato"); }
 }
-void LowlineProcessor::openPreset(const File &f, bool preserveMidi)
+bool LowlineProcessor::buildPreset(const File &f, bool preserveMidi, MemoryBlock &out)
 {
     MemoryBlock b;
     if (f.getSize() > 300LL * 1024 * 1024 || !f.loadFileAsData(b))
     {
         setStatus("Cannot read preset");
-        return;
+        return false;
     }
     auto xml = getXmlFromBinary(b.getData(), (int)b.getSize());
     if (!xml || !xml->hasTagName("Lowline"))
     {
         setStatus("Invalid Lowline preset");
-        return;
+        return false;
     }
     auto tree = ValueTree::fromXml(*xml);
     int64 total = 0;
@@ -713,20 +764,22 @@ void LowlineProcessor::openPreset(const File &f, bool preserveMidi)
         if (encoded.isEmpty()) continue;
         MemoryBlock bytes;
         if (!bytes.fromBase64Encoding(encoded) || bytes.getSize() > 64 * 1024 * 1024)
-        { setStatus("Invalid portable asset."); return; }
+        { setStatus("Invalid portable asset."); return false; }
         total += int64(bytes.getSize());
         const String ext = tree.getProperty("ext" + String(slot)).toString().toLowerCase();
         if (total > 192LL * 1024 * 1024 || (slot < 2 ? ext != ".nam" : !StringArray{".wav", ".aif", ".aiff"}.contains(ext)))
-        { setStatus("Invalid portable asset type or size."); return; }
+        { setStatus("Invalid portable asset type or size."); return false; }
         auto cache = File::getSpecialLocation(File::userApplicationDataDirectory).getChildFile("Lowline/Assets");
-        if (cache.createDirectory().failed()) { setStatus("Cannot create asset cache."); return; }
+        if (cache.createDirectory().failed()) { setStatus("Cannot create asset cache."); return false; }
+        // The name is the content hash: an existing file of the same size is already that asset,
+        // so Program Change switching does not re-hash large IRs every time.
         auto asset = cache.getChildFile(SHA256(bytes).toHexString() + ext);
-        if (!asset.existsAsFile() || SHA256(asset).toHexString() != SHA256(bytes).toHexString())
+        if (!asset.existsAsFile() || asset.getSize() != int64(bytes.getSize()))
         {
             TemporaryFile temporary(asset);
             if (!temporary.getFile().replaceWithData(bytes.getData(), bytes.getSize()) ||
                 !temporary.overwriteTargetFileWithTemporary())
-            { setStatus("Cannot extract portable asset."); return; }
+            { setStatus("Cannot extract portable asset."); return false; }
         }
         tree.setProperty("file" + String(slot), asset.getFullPathName(), nullptr);
         tree.removeProperty("asset" + String(slot), nullptr);
@@ -743,11 +796,26 @@ void LowlineProcessor::openPreset(const File &f, bool preserveMidi)
             tree.addChild(currentTree.getChildWithName(name).createCopy(), -1, nullptr);
         }
     }
-    auto extracted = tree.createXml(); b.reset(); copyXmlToBinary(*extracted, b);
-    setStateInformation(b.getData(), (int)b.getSize());
+    auto extracted = tree.createXml(); out.reset(); copyXmlToBinary(*extracted, out);
+    return true;
+}
+void LowlineProcessor::openPreset(const File &f, bool preserveMidi)
+{
+    MemoryBlock bytes;
+    if (!buildPreset(f, preserveMidi, bytes)) return;
+    setStateInformation(bytes.getData(), (int)bytes.getSize());
     cleanWhenReady = true;
     // Loader errors must remain visible instead of being overwritten by a success message.
 }
+void LowlineProcessor::handleAsyncUpdate()
+{
+    MemoryBlock bytes;
+    { std::lock_guard g(presetMutex); bytes.swapWith(pendingPreset); }
+    if (bytes.getSize() == 0) return;
+    setStateInformation(bytes.getData(), (int)bytes.getSize());
+    cleanWhenReady = true;
+}
+
 AudioProcessorEditor *LowlineProcessor::createEditor()
 {
     return new LowlineEditor(*this);

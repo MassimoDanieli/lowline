@@ -119,7 +119,7 @@ Starting point: TIME 380 ms, FEEDBACK 27%, DELAY LEVEL 18%, HIGH CUT 3500 Hz.
 
 SYNC in TOOLS calculates delay from TEMPO and a subdivision: 1/16, 1/8, dotted 1/8, 1/4, dotted 1/4 or 1/2. At 120 BPM a quarter note is 500 ms and a dotted eighth is 375 ms. TIME is ignored while SYNC is enabled; the effective delay appears below the selector.
 
-HOST BPM uses DAW tempo when supplied and within 30–300 BPM. Standalone or an unavailable/invalid host tempo falls back to TEMPO (30–240 BPM). The DAW/Manual label identifies the source. TAP derives tempo from two presses 250–2000 ms apart: press regularly at least twice. Disable HOST BPM to use taps when the host is providing a valid tempo. Tap tempo is also available through MIDI learn.
+HOST BPM uses DAW tempo when supplied and within 30–300 BPM. Standalone or an unavailable/invalid host tempo falls back to TEMPO (30–240 BPM). The DAW/Manual label identifies the source. TAP averages the latest presses (intervals 250–2000 ms; a press far off the running tempo starts over): press regularly at least twice. With SYNC off, TAP sets TIME directly from the selected division (1/4 = the tapped interval). Disable HOST BPM to use taps when the host is providing a valid tempo. Tap tempo is also available through MIDI learn.
 
 DELAY LOW CUT (0…1000 Hz) reduces low frequencies in the repeats and feedback; 0 disables it. Try 100–200 Hz if repeats muddy the bass. HIGH CUT remains in RIG. Synchronised delay can exceed the manual TIME control's 1500 ms maximum.
 
@@ -173,7 +173,7 @@ Control Change (CC):
 
 For CC 20…27, values 0…63 switch off and 64…127 switch on. Configure a latching switch that alternates 0 and 127. A momentary switch may enable an effect only while held, depending on its programming.
 
-MIDI LEARN: choose a parameter, click LEARN and move the controller. The next received CC is assigned to that parameter; its previous assignment is removed. CANCEL stops listening, CLEAR removes the selected parameter's assignment and RESET restores the initial map above. The list shows assigned CCs.
+MIDI LEARN: choose a parameter, click LEARN and move the controller. The next received CC is assigned to that parameter; its previous assignment is removed. CANCEL stops listening, CLEAR removes the selected parameter's assignment and RESET restores the initial map above. The list shows assigned CCs. The menu next to the instructions sets how CCs drive switches (ON/OFF): Latching = 127 on / 0 off (controllers that send the state), Momentary = every press flips the switch (buttons sending 127 on press and 0 on release). The setting is saved with the MIDI map.
 
 Continuous controls use the parameter's full range across values 0…127, so learned OUTPUT reaches +12 dB while default CC 7 keeps its original +6 dB ceiling. Buttons use 0…63 off and 64…127 on. Tap tempo triggers on a transition from low to high: the controller must also transmit release.
 

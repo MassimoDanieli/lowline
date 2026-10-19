@@ -331,7 +331,11 @@ int main(int argc, char **argv)
         restored.assignProgram(8, assignedPreset); set(restored, "blend", 77);
         MidiBuffer pc;
         pc.addEvent(MidiMessage::programChange(1, 8), 0); restored.processBlock(b, pc);
-        for (int i = 0; i < 200 && std::abs(restored.state.getRawParameterValue("blend")->load() - 33) > .01f; ++i) Thread::sleep(10);
+        for (int i = 0; i < 200 && std::abs(restored.state.getRawParameterValue("blend")->load() - 33) > .01f; ++i)
+        {
+            Thread::sleep(10);
+            restored.handleUpdateNowIfNeeded(); // the preset is applied on the message thread
+        }
         wait(restored);
         require(std::abs(restored.state.getRawParameterValue("blend")->load() - 33) < .01f &&
                 restored.programAssignment(8) == assignedPreset.getFullPathName(),
@@ -649,6 +653,69 @@ int main(int argc, char **argv)
             helpOut.setPosition(0);
             helpOut.truncate();
             fmt.writeImageToStream(help.createComponentSnapshot(help.getLocalBounds()), helpOut);
+        }
+        {
+            // 0.2.1 regressions: preset reload gap, momentary switches, TAP, host bypass mute, idle captures.
+            auto halfModel = temp.getChildFile("half.nam");
+            halfModel.replaceWithText(
+                R"({"version":"0.5.4","architecture":"Linear","config":{"receptive_field":1,"bias":false},"weights":[0.5],"sample_rate":48000})");
+            LowlineProcessor r;
+            r.prepareToPlay(48000, 256);
+            for (auto *id : {"compOn", "pedalOn", "cabOn", "delayOn", "reverbOn"}) set(r, id, 0);
+            set(r, "blend", 100); set(r, "output", 0);
+            r.loadFile(LowlineProcessor::Amp, halfModel); wait(r);
+            AudioBuffer<float> a(2, 256);
+            settle(r, a, .1f);
+            MemoryBlock same; r.getStateInformation(same);
+            r.setStateInformation(same.getData(), int(same.getSize()));
+            float worst = 0;
+            MidiBuffer none2;
+            for (int k = 0; k < 60; ++k)
+            {
+                for (int c = 0; c < 2; ++c) for (int i = 0; i < 256; ++i) a.setSample(c, i, .1f);
+                r.processBlock(a, none2);
+                worst = std::max(worst, a.getMagnitude(0, 0, 256));
+                Thread::sleep(3);
+            }
+            wait(r);
+            require(worst < .06f, "reloading the same preset keeps the amp playing (no raw DI gap)");
+
+            set(r, "compOn", 0);
+            r.momentarySwitches = true;
+            auto footswitch = [&](int value)
+            {
+                MidiBuffer event; // processBlock consumes the buffer
+                event.addEvent(MidiMessage::controllerEvent(1, 20, value), 0);
+                r.processBlock(a, event);
+            };
+            footswitch(127); footswitch(0);
+            require(r.state.getRawParameterValue("compOn")->load() > .5f, "momentary footswitch: press turns on, release keeps it");
+            footswitch(127); footswitch(0);
+            require(r.state.getRawParameterValue("compOn")->load() < .5f, "momentary footswitch: second press turns off");
+            MemoryBlock withMode; r.getStateInformation(withMode);
+            LowlineProcessor r2; r2.setStateInformation(withMode.getData(), int(withMode.getSize()));
+            require(r2.momentarySwitches.load(), "footswitch mode is saved with the MIDI map");
+            r.momentarySwitches = false;
+
+            set(r, "sync", 0);
+            r.tapTempo(); Thread::sleep(500); r.tapTempo(); Thread::sleep(500); r.tapTempo();
+            require(std::abs(r.state.getRawParameterValue("time")->load() - 500) < 40, "TAP without sync sets the delay time");
+
+            set(r, "tunerOn", 1); set(r, "tunerMute", 1);
+            AudioBuffer<float> hb(2, 256);
+            for (int k = 0; k < 4; ++k)
+            {
+                for (int c = 0; c < 2; ++c) for (int i = 0; i < 256; ++i) hb.setSample(c, i, .2f);
+                r.processBlockBypassed(hb, none2);
+            }
+            require(std::abs(hb.getSample(0, 255) - .2f) < .001f, "host bypass is never muted by the tuner");
+            set(r, "tunerOn", 0); set(r, "tunerMute", 0);
+
+            set(r, "ampOn", 0);
+            settle(r, a, .1f);
+            set(r, "ampOn", 1);
+            settle(r, a, .1f);
+            require(std::abs(a.getSample(0, 255) - .05f) < .002f, "a capture switched back on after idling plays normally");
         }
         temp.deleteRecursively();
         std::cout << "All audio checks passed.\n";

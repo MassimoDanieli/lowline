@@ -10,7 +10,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_dsp/juce_dsp.h>
 #include <thread>
-class LowlineProcessor : public juce::AudioProcessor
+class LowlineProcessor : public juce::AudioProcessor, public juce::AsyncUpdater
 {
   public:
     LowlineProcessor();
@@ -76,12 +76,18 @@ class LowlineProcessor : public juce::AudioProcessor
     void assignProgram(int pc, const juce::File &file);
     juce::String programAssignment(int pc) const;
     std::atomic<int> learnTarget{-1};
+    // false: the CC value sets a switch (latching pedals, 127 = on / 0 = off).
+    // true: every press (rising edge >= 64) flips it (momentary footswitches).
+    std::atomic<bool> momentarySwitches{false};
     std::atomic<float> cpuLoad{0}, effectiveDelay{380}, effectiveTempo{120};
     std::atomic<bool> usingHostTempo{false};
     std::array<std::atomic<bool>, 2> normalisationAvailable{};
     std::array<std::atomic<float>, 2> modelLoudness{};
     LowlineTuner tuner;
     void openPreset(const juce::File &, bool preserveMidi = false);
+    // Program Change presets are read on the worker and applied here, on the message thread
+    // (APVTS replaceState also clears the UndoManager, which is not thread-safe).
+    void handleAsyncUpdate() override;
     juce::String getLanguage() const { return italian.load() ? "IT" : "EN"; }
     void setLanguage(const juce::String &value) { italian = value != "EN"; }
     static juce::AudioProcessorValueTreeState::ParameterLayout parameters();
@@ -96,7 +102,10 @@ class LowlineProcessor : public juce::AudioProcessor
     void publishCapture(Slot, const juce::File &, std::unique_ptr<LowlineCapture>);
 
     void processChunk(juce::AudioBuffer<float> &, int, int);
-    void limitOutput(juce::AudioBuffer<float> &);
+    void limitOutput(juce::AudioBuffer<float> &, bool allowMute = true);
+    bool buildPreset(const juce::File &, bool preserveMidi, juce::MemoryBlock &);
+    std::mutex presetMutex;
+    juce::MemoryBlock pendingPreset;
     void setStatus(const juce::String &);
     std::atomic<int> program{0};
     std::atomic<bool> italian{true};
@@ -111,6 +120,7 @@ class LowlineProcessor : public juce::AudioProcessor
     std::array<std::atomic<bool>, 4> loaded{};
     mutable std::mutex metadataMutex;
     std::array<juce::String, 4> paths{};
+    std::array<juce::Time, 4> modified{};
     juce::String message = "Ready / Pronto";
     std::mutex jobsMutex;
     std::condition_variable jobsReady;
@@ -121,6 +131,7 @@ class LowlineProcessor : public juce::AudioProcessor
         bool scene = false;
         juce::String warning;
         std::array<juce::File, 4> files;
+        std::array<bool, 4> keep{}; // scene: slot already holds this exact file
     };
     std::deque<Job> jobs;
     bool stopping = false;
@@ -139,6 +150,9 @@ class LowlineProcessor : public juce::AudioProcessor
     std::array<std::atomic<bool>, 128> programAssigned{};
     std::atomic<int> requestedProgram{-1};
     std::atomic<double> lastTap{0};
+    juce::SpinLock tapLock;
+    std::array<double, 3> tapIntervals{};
+    int tapCount = 0;
     std::array<juce::MemoryBlock, 2> comparison;
     std::array<float, 2> comparisonRms{-100, -100};
     juce::String cleanSignature;

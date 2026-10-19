@@ -152,7 +152,11 @@ LowlineEditor::LowlineEditor(LowlineProcessor &p) : AudioProcessorEditor(p), pro
     midiTarget.setSelectedId(1);
     for (int pc = 0; pc < 128; ++pc) midiProgram.addItem("PC " + String(pc), pc + 1);
     midiProgram.setSelectedId(5);
-    for (auto *box : {&division, &midiTarget, &midiProgram}) addAndMakeVisible(*box);
+    switchMode.addItem("Latching: 127 = on, 0 = off", 1);
+    switchMode.addItem("Momentary: each press toggles", 2);
+    switchMode.setSelectedId(proc.momentarySwitches ? 2 : 1, dontSendNotification);
+    switchMode.onChange = [this] { proc.momentarySwitches = switchMode.getSelectedId() == 2; };
+    for (auto *box : {&division, &midiTarget, &midiProgram, &switchMode}) addAndMakeVisible(*box);
     division.addItemList({"1/16", "1/8", "1/8 dotted", "1/4", "1/4 dotted", "1/2"}, 1);
     divisionLink = std::make_unique<AudioProcessorValueTreeState::ComboBoxAttachment>(proc.state, "division", division);
     learnButton.onClick = [this] { proc.armMidiLearn(midiTarget.getSelectedId() - 1); };
@@ -245,7 +249,7 @@ void LowlineEditor::paint(Graphics &g)
     g.drawText("lowline", 24, 10, 220, 54, Justification::centredLeft);
     g.setColour(gold);
     g.setFont(Font(11.f));
-    g.drawText("0.3.0  /  BASS WORKSPACE", 250, 31, 240, 20, Justification::centredLeft);
+    g.drawText(String(JucePlugin_VersionString) + "  /  BASS WORKSPACE", 250, 31, 240, 20, Justification::centredLeft);
     if (page == 0)
     {
     panel(g, {24, 122, 550, 210}, "01  /  DYNAMICS", mint);
@@ -299,7 +303,7 @@ void LowlineEditor::resized()
     for (auto *component : std::initializer_list<Component *>{&division, &tapButton, &tunerLabel, &syncLabel, &normLabel})
         component->setVisible(page == 1);
     for (auto *component : std::initializer_list<Component *>{&midiTarget, &midiProgram, &learnButton, &cancelLearn,
-            &clearMapping, &resetMapping, &assignButton, &unassignButton, &midiHint, &assignmentLabel, &mappingText})
+            &clearMapping, &resetMapping, &assignButton, &unassignButton, &midiHint, &assignmentLabel, &mappingText, &switchMode})
         component->setVisible(page == 2);
     rigTab.setToggleState(page == 0, dontSendNotification);
     toolsTab.setToggleState(page == 1, dontSendNotification);
@@ -337,7 +341,8 @@ void LowlineEditor::resized()
     }
     if (page == 2)
     {
-        midiHint.setBounds(42, 166, 1090, 30);
+        midiHint.setBounds(42, 166, 740, 30);
+        switchMode.setBounds(800, 166, 338, 30);
         midiTarget.setBounds(42, 210, 430, 32);
         learnButton.setBounds(492, 210, 138, 32); cancelLearn.setBounds(646, 210, 138, 32);
         clearMapping.setBounds(800, 210, 154, 32); resetMapping.setBounds(970, 210, 168, 32);
@@ -401,6 +406,7 @@ void LowlineEditor::timerCallback()
                            (tuningMute ? "   TUNER MUTE" : "") + (clip ? "   LIMIT - lower output" : ""),
                        dontSendNotification);
     programs.setSelectedId(proc.getCurrentProgram() + 1, dontSendNotification);
+    switchMode.setSelectedId(proc.momentarySwitches ? 2 : 1, dontSendNotification);
     const bool it = proc.getLanguage() == "IT";
     const float frequency = proc.tuner.frequency.load();
     String tuning = it ? "Suona una corda" : "Play one string";
@@ -467,18 +473,29 @@ bool LowlineEditor::isInterestedInFileDrag(const StringArray &files)
 {
     return files.size() == 1 && (File(files[0]).hasFileExtension("nam;wav;aiff;aif;lowline"));
 }
-void LowlineEditor::filesDropped(const StringArray &files, int, int y)
+void LowlineEditor::filesDropped(const StringArray &files, int x, int y)
 {
     if (files.isEmpty())
         return;
     File f(files[0]);
     if (f.hasFileExtension("lowline"))
+    {
         proc.openPreset(f);
-    else
-        proc.loadFile(f.hasFileExtension("nam") ? LowlineProcessor::Amp
-                      : y >= 579                ? LowlineProcessor::Room
-                                                : LowlineProcessor::Cab,
-                      f);
+        return;
+    }
+    // Dropped on a slot row: load exactly there (a .nam can go to the pedal slot too).
+    if (page == 0)
+        for (int i = 0; i < 4; ++i)
+            if (loadButtons[size_t(i)].getBounds().expanded(0, 8).contains(x, y) &&
+                f.hasFileExtension(i < 2 ? "nam" : "wav;aiff;aif"))
+            {
+                proc.loadFile((LowlineProcessor::Slot)i, f);
+                return;
+            }
+    proc.loadFile(f.hasFileExtension("nam") ? LowlineProcessor::Amp
+                  : y >= 579                ? LowlineProcessor::Room
+                                            : LowlineProcessor::Cab,
+                  f);
 }
 
 void LowlineEditor::assignMidiPreset()

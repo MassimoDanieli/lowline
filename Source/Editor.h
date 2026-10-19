@@ -58,7 +58,7 @@ class LowlineEditor : public juce::AudioProcessorEditor,
     std::unique_ptr<LowlineWorkbench> workbench;
     int page = 0;
     int statusTicks = 0;
-    juce::ComboBox division, midiTarget, midiProgram;
+    juce::ComboBox division, midiTarget, midiProgram, switchMode;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> divisionLink;
     juce::Label tunerLabel, syncLabel, normLabel, midiHint, assignmentLabel;
     juce::TextEditor mappingText;

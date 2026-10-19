@@ -1,3 +1,16 @@
+# 0.3.1
+
+Fixes from a code review; each behaviour change has a regression test in `tests/Tests.cpp`.
+
+- Preset recall, Program Change and A/B recall keep every slot that already holds the same unmodified file: no re-parse, no crossfade, no wait for the other slots. Before, every recall reloaded all four files and rendered the old room IR as a "tail" next to the identical new one for the whole IR length (up to 20 s at double reverb CPU).
+- Switched-off captures are not rendered: NAM pedal/amp OFF and a room IR with REVERB off cost no CPU (measured here: A1 amp off 38% → 5%; 10 s room with reverb off 27% → 6%; clearing the room no longer renders its tail for 10 s at ~30%). On re-enable an IR starts clean and a NAM model refills its receptive field before fading in.
+- Program Change presets are read on the worker but applied on the message thread. `replaceState` clears the UndoManager, which is not thread-safe, while the workspace reads it four times a second.
+- MIDI footswitch mode on the MIDI page: Latching (127 on / 0 off, as before) or Momentary (each press toggles). Momentary buttons used to switch an effect on at press and off again at release. Saved with the MIDI map.
+- TAP averages the latest taps, restarts after a tap far from the running tempo and, with SYNC off, sets TIME directly. Before, TAP had no audible effect unless SYNC was on.
+- Host bypass is never muted by the tuner mute.
+- Portable presets: an extracted asset is recognised by its content-hash name and size instead of being re-hashed on every recall.
+- Dropping a file on a slot row loads it there (a .nam can go to the pedal slot). The header shows the build version.
+
 # 0.3.0
 
 - Add searchable personal NAM/IR/preset library, favourites, recents and tags.

@@ -119,7 +119,7 @@ Punto di partenza: TIME 380 ms, FEEDBACK 27%, DELAY LEVEL 18%, HIGH CUT 3500 Hz.
 
 SYNC, in STRUMENTI, calcola il ritardo da TEMPO e dalla suddivisione scelta: 1/16, 1/8, 1/8 puntata, 1/4, 1/4 puntata o 1/2. A 120 BPM, 1/4 vale 500 ms e 1/8 puntata 375 ms. Con SYNC attivo TIME viene ignorato; la durata effettiva è mostrata sotto il selettore.
 
-HOST BPM usa il tempo comunicato dalla DAW, se disponibile e compreso fra 30 e 300 BPM. In standalone o senza un tempo valido si usa TEMPO (30…240 BPM). Il testo DAW/Manual indica quale sorgente è in uso. TAP ricava il tempo dall'intervallo fra due pressioni, fra 250 e 2000 ms: premi regolarmente almeno due volte. Se HOST BPM sta fornendo un tempo valido, disattivalo per usare quello battuto. TAP è assegnabile anche via MIDI learn.
+HOST BPM usa il tempo comunicato dalla DAW, se disponibile e compreso fra 30 e 300 BPM. In standalone o senza un tempo valido si usa TEMPO (30…240 BPM). Il testo DAW/Manual indica quale sorgente è in uso. TAP ricava il tempo dalla media delle ultime pressioni (intervalli fra 250 e 2000 ms; una pressione molto fuori tempo riparte da capo): premi regolarmente almeno due volte. Con SYNC spento, TAP imposta direttamente TIME secondo la suddivisione scelta (1/4 = intervallo battuto). Se HOST BPM sta fornendo un tempo valido, disattivalo per usare quello battuto. TAP è assegnabile anche via MIDI learn.
 
 DELAY LOW CUT (0…1000 Hz) riduce le basse delle ripetizioni e del feedback; 0 lo disattiva. Prova 100–200 Hz se gli echi impastano il basso. HIGH CUT rimane nella scheda RIG. Il ritardo sincronizzato può superare i 1500 ms del controllo manuale.
 
@@ -173,7 +173,7 @@ Control Change (CC):
 
 Per CC 20…27: valori 0…63 spengono, 64…127 accendono. Configura un interruttore che alterni 0 e 127. Un pulsante momentaneo può tenere acceso l'effetto soltanto finché è premuto, secondo la sua programmazione.
 
-MIDI LEARN: scegli il parametro nel menu, premi LEARN e muovi il controllo della pedaliera. Il prossimo CC ricevuto viene associato al parametro; la precedente associazione di quel parametro viene rimossa. CANCEL annulla l'attesa, CLEAR rimuove l'associazione del parametro selezionato e RESET ripristina la mappa iniziale riportata sopra. La lista mostra i CC assegnati.
+MIDI LEARN: scegli il parametro nel menu, premi LEARN e muovi il controllo della pedaliera. Il prossimo CC ricevuto viene associato al parametro; la precedente associazione di quel parametro viene rimossa. CANCEL annulla l'attesa, CLEAR rimuove l'associazione del parametro selezionato e RESET ripristina la mappa iniziale riportata sopra. La lista mostra i CC assegnati. Il menu accanto alle istruzioni sceglie come i CC comandano gli interruttori (ON/OFF): Latching = 127 acceso / 0 spento (pedaliere che inviano lo stato), Momentary = ogni pressione inverte lo stato (pulsanti che inviano 127 alla pressione e 0 al rilascio). L'impostazione è salvata con la mappa MIDI.
 
 I controlli continui usano l'intervallo completo del parametro con valori 0…127; quindi OUTPUT appreso via learn raggiunge +12 dB, mentre il CC 7 predefinito mantiene il limite storico di +6 dB. I pulsanti usano 0…63 spento e 64…127 acceso. Tap tempo reagisce al passaggio dal valore basso a quello alto: la pedaliera deve inviare anche il rilascio.
 
