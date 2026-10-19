@@ -99,13 +99,16 @@ jobs:
           path: build/Testing/Temporary/*.log
 
   release:
-    name: Publish 0.3.0 downloads
+    name: Publish downloads for the CMake version
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source
       - uses: actions/download-artifact@v4
         with:
           pattern: Lowline-*
@@ -119,25 +122,33 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if gh release view v0.3.0 >/dev/null 2>&1; then
-            echo 'Version 0.3.0 already exists; never overwrite a published version.'
+          # The version comes from project(Lowline VERSION x.y.z) in CMakeLists.txt: bump it to publish.
+          VERSION=$(sed -nE 's/^project\(Lowline VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' source/CMakeLists.txt)
+          test -n "$VERSION"
+          TAG="v$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Version $VERSION already exists; never overwrite a published version. Bump CMakeLists.txt to release."
             exit 0
           fi
+          # Release notes: the CHANGELOG section of this version (from its heading to the next one).
+          CHANGES=$(awk -v v="$VERSION" '
+            /^# / { if (found) exit; if ($0 ~ "^# (Lowline )?" v "([^0-9.]|$)") { found = 1; next } }
+            found { print }' source/CHANGELOG.md)
           cd packages
           sha256sum Lowline-macOS-universal.zip Lowline-macOS-universal.dmg Lowline-Windows-x64.zip Lowline-Linux-x64.tar.gz > SHA256SUMS.txt
-          cat > notes.md <<'NOTES'
-          ## Lowline 0.3.0 — Bass workspace
-          **Scarica / Download:** choose your system under **Assets**, not Source code.
-          - macOS universal: DMG or ZIP, Apple Silicon + Intel, standalone / AU / VST3. Installation helper included. Not Developer-ID signed or notarised.
-          - Windows x64 ZIP: standalone / VST3.
-          - Linux x64 tar.gz: standalone / VST3 (Ubuntu 24.04-compatible libraries).
-
-          New: searchable library, favourites and recent files; A/B snapshots and measured RMS matching; backing player with offline pitch-preserving speed adjustment, looping and accented metronome; dual DI/FX float-WAV recording; preset details and control undo/redo; stage view; grouped capture preparation and room tail carry-over; guided audio diagnostics and update link.
-
-          [Guida italiana](https://github.com/MassimoDanieli/lowline/blob/main/docs/HELP_IT.md) · [English guide](https://github.com/MassimoDanieli/lowline/blob/main/docs/HELP_EN.md) · [Validation and limits](https://github.com/MassimoDanieli/lowline/blob/main/VALIDATION.md)
-
-          All three native build/test jobs must succeed before this release is published. Hardware listening, actual interface latency and Apple notarisation are not certified by these tests. No NAM captures or IRs are bundled.
-          NOTES
-          gh release create v0.3.0 --target "$SOURCE_SHA" --title 'Lowline 0.3.0 — Bass workspace' --notes-file notes.md --draft
-          gh release upload v0.3.0 Lowline-macOS-universal.zip Lowline-macOS-universal.dmg Lowline-Windows-x64.zip Lowline-Linux-x64.tar.gz SHA256SUMS.txt
-          gh release edit v0.3.0 --draft=false --latest
+          {
+            echo "## Lowline $VERSION"
+            echo '**Scarica / Download:** choose your system under **Assets**, not Source code.'
+            echo '- macOS universal: DMG or ZIP, Apple Silicon + Intel, standalone / AU / VST3. Installation helper included. Not Developer-ID signed or notarised.'
+            echo '- Windows x64 ZIP: standalone / VST3.'
+            echo '- Linux x64 tar.gz: standalone / VST3 (Ubuntu 24.04-compatible libraries).'
+            echo
+            echo "$CHANGES"
+            echo
+            echo '[Guida italiana](https://github.com/MassimoDanieli/lowline/blob/main/docs/HELP_IT.md) · [English guide](https://github.com/MassimoDanieli/lowline/blob/main/docs/HELP_EN.md) · [Validation and limits](https://github.com/MassimoDanieli/lowline/blob/main/VALIDATION.md)'
+            echo
+            echo 'All three native build/test jobs must succeed before this release is published. Hardware listening, actual interface latency and Apple notarisation are not certified by these tests. No NAM captures or IRs are bundled.'
+          } > notes.md
+          gh release create "$TAG" --target "$SOURCE_SHA" --title "Lowline $VERSION" --notes-file notes.md --draft
+          gh release upload "$TAG" Lowline-macOS-universal.zip Lowline-macOS-universal.dmg Lowline-Windows-x64.zip Lowline-Linux-x64.tar.gz SHA256SUMS.txt
+          gh release edit "$TAG" --draft=false --latest
