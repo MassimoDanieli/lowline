@@ -68,8 +68,9 @@ LowlineProcessor::LowlineProcessor()
     : AudioProcessor(BusesProperties()
                          .withInput("Input", AudioChannelSet::stereo(), true)
                          .withOutput("Output", AudioChannelSet::stereo(), true)),
-      state(*this, &undo, "Lowline", parameters())
+      state(*this, nullptr, "Lowline", parameters())
 {
+    for (auto *parameter : getParameters()) parameter->addListener(this);
     for (auto *parameter : getParameters())
         if (auto *ranged = dynamic_cast<RangedAudioParameter *>(parameter)) midiTargets.push_back(ranged);
     resetMidiMappings();
@@ -260,7 +261,8 @@ void LowlineProcessor::processBlock(AudioBuffer<float> &buffer, MidiBuffer &m)
         peak = std::max(peak, buffer.getMagnitude(c, 0, buffer.getNumSamples()));
     inputPeak = peak;
     const double started = Time::getMillisecondCounterHiRes();
-    if (measureRequested.exchange(false)) { measureEnergy = 0; measureCount = 0; measureRemaining = int(rate.load()*5); measuredRms = -100; }
+    if (measureAfterLoad && !busy) { measureAfterLoad = false; measureRequested = true; }
+    if (measureRequested.exchange(false)) { measureStartVersion = stateVersion.load(); measureEnergy = 0; measureCount = 0; measureRemaining = int(rate.load()*5); measuredRms = -100; }
     float bpm = p("tempo");
     bool host = false;
     if (p("sync") && p("hostSync"))
@@ -284,7 +286,14 @@ void LowlineProcessor::processBlock(AudioBuffer<float> &buffer, MidiBuffer &m)
                 const float x = buffer.getSample(0,i);
                 measureEnergy += x*x; ++measureCount;
                 if (--measureRemaining == 0)
-                { measuredRms = lowline::toDb(float(std::sqrt(measureEnergy/std::max(1,measureCount)))); measureEnergy = 0; measureCount = 0; }
+                {
+                    measuredRms = lowline::toDb(float(std::sqrt(measureEnergy/std::max(1,measureCount)))); measureEnergy = 0; measureCount = 0;
+                    // Valid only if nothing changed while measuring.
+                    const bool fresh = stateVersion.load() == measureStartVersion.load();
+                    measuredVersion = fresh ? measureStartVersion.load() : 0xffffffffu;
+                    const int target = measureFor.exchange(-1);
+                    if (fresh && target >= 0 && target < 2) comparisonRms[size_t(target)] = measuredRms.load();
+                }
             }
             for (int c = 0; c < getTotalNumOutputChannels(); ++c) buffer.setSample(c,i,buffer.getSample(c,i)*gain);
         }
@@ -610,6 +619,7 @@ void LowlineProcessor::publishCapture(Slot slot, const File &file, std::unique_p
         modelLoudness[size_t(slot)] = capture->loudness;
     }
     captures[size_t(slot)].publish(std::move(capture));
+    ++stateVersion;
     loaded[size_t(slot)] = file != File{};
     {
         std::lock_guard g(metadataMutex);
@@ -627,8 +637,24 @@ void LowlineProcessor::setCurrentProgram(int i)
 {
     if (i < 0 || i >= 4)
         return;
+    if (MessageManager::existsAndIsCurrentThread())
+    {
+        auto before = parameterSnapshot();
+        applyProgram(i);
+        state.state.setProperty("presetName", getProgramName(i), nullptr);
+        recordUndo(getProgramName(i), std::move(before));
+    }
+    else
+    {
+        // MIDI Program Change on the audio thread: never touch the ValueTree here.
+        applyProgram(i);
+        programNamePending = i;
+        triggerAsyncUpdate();
+    }
+}
+void LowlineProcessor::applyProgram(int i)
+{
     program = i;
-    state.state.setProperty("presetName", getProgramName(i), nullptr);
     // Deterministic sound settings; preserve interface selection and input/output calibration.
     set("gateOn", 0); set("gateThreshold", -55); set("gateRelease", 150);
     set("lowMid", 0); set("highMid", 0);
@@ -691,6 +717,10 @@ void LowlineProcessor::getStateInformation(MemoryBlock &dest)
 }
 void LowlineProcessor::setStateInformation(const void *data, int size)
 {
+    restoreState(data, size, false);
+}
+void LowlineProcessor::restoreState(const void *data, int size, bool keepUndo)
+{
     auto xml = getXmlFromBinary(data, size);
     if (!xml || !xml->hasTagName("Lowline"))
         return;
@@ -704,6 +734,12 @@ void LowlineProcessor::setStateInformation(const void *data, int size)
             tree.addChild(child, -1, nullptr);
         }
     state.replaceState(tree);
+    if (!keepUndo)
+    {
+        // A loaded preset or host session starts a fresh history (UndoManager: message thread only).
+        if (MessageManager::existsAndIsCurrentThread()) undo.clearUndoHistory();
+        else { clearUndoPending = true; triggerAsyncUpdate(); }
+    }
     resetMidiMappings();
     auto mappings = tree.getChildWithName("MidiMappings");
     if (mappings.isValid())
@@ -841,6 +877,9 @@ void LowlineProcessor::openPreset(const File &f, bool preserveMidi)
 }
 void LowlineProcessor::handleAsyncUpdate()
 {
+    if (clearUndoPending.exchange(false)) undo.clearUndoHistory();
+    if (const int named = programNamePending.exchange(-1); named >= 0)
+        state.state.setProperty("presetName", getProgramName(named), nullptr);
     MemoryBlock bytes;
     { std::lock_guard g(presetMutex); bytes.swapWith(pendingPreset); }
     if (bytes.getSize() == 0) return;
@@ -881,18 +920,97 @@ bool LowlineProcessor::isDirty()
 void LowlineProcessor::storeComparison(int index)
 {
     if (index < 0 || index > 1 || busy) return;
-    getStateInformation(comparison[size_t(index)]); comparisonRms[size_t(index)] = measuredRms;
-    setStatus(String("Stored / Memorizzato ") + (index == 0 ? "A" : "B"));
+    getStateInformation(comparison[size_t(index)]);
+    const String name = index == 0 ? "A" : "B";
+    if (measurementFresh())
+    {
+        comparisonRms[size_t(index)] = measuredRms.load();
+        setStatus("Stored / Memorizzato " + name);
+    }
+    else
+    {
+        // No valid measurement of this exact sound: measure it now and attach the result.
+        comparisonRms[size_t(index)] = -100.f;
+        measureFor = index;
+        measureLevel();
+        setStatus("Stored " + name + ": play for 5 s to measure / Memorizzato " + name + ": suona per 5 s per misurarlo");
+    }
 }
 bool LowlineProcessor::recallComparison(int index)
 {
     if (!hasComparison(index) || busy) return false;
+    auto before = parameterSnapshot();
     auto &b = comparison[size_t(index)];
-    setStateInformation(b.getData(), int(b.getSize())); compareTrim = 0; return true;
+    restoreState(b.getData(), int(b.getSize()), true); // A/B keeps the undo history
+    recordUndo(index == 0 ? "Recall A" : "Recall B", std::move(before));
+    compareTrim = 0;
+    measureAfterLoad = true; // MATCH needs a measurement of the recalled sound
+    return true;
 }
 void LowlineProcessor::matchComparison(int reference)
 {
     if (reference < 0 || reference > 1 || comparisonRms[size_t(reference)] < -60 || measuredRms < -60)
     { setStatus("Measure both sounds above -60 dB RMS / Misura entrambi i suoni"); return; }
+    if (!measurementFresh())
+    { setStatus("Measure the current sound first / Misura prima il suono attuale"); return; }
     compareTrim = juce::jlimit(-12.f, 12.f, comparisonRms[size_t(reference)] - measuredRms.load());
+}
+
+namespace
+{
+struct SnapshotAction : UndoableAction
+{
+    SnapshotAction(LowlineProcessor &p, std::vector<float> b, std::vector<float> a)
+        : processor(p), before(std::move(b)), after(std::move(a)) {}
+    bool perform() override
+    {
+        if (first) { first = false; return true; } // already applied when recorded
+        processor.applySnapshot(after);
+        return true;
+    }
+    bool undo() override { processor.applySnapshot(before); return true; }
+    int getSizeInUnits() override { return int(before.size() * 2 * sizeof(float)) / 64 + 1; }
+    LowlineProcessor &processor;
+    std::vector<float> before, after;
+    bool first = true;
+};
+} // namespace
+std::vector<float> LowlineProcessor::parameterSnapshot() const
+{
+    std::vector<float> values;
+    for (auto *parameter : getParameters()) values.push_back(parameter->getValue());
+    return values;
+}
+void LowlineProcessor::applySnapshot(const std::vector<float> &values)
+{
+    const auto &parameters = getParameters();
+    applyingUndo = true;
+    for (size_t i = 0; i < values.size() && i < size_t(parameters.size()); ++i)
+        if (std::abs(parameters[int(i)]->getValue() - values[i]) > 1.e-7f)
+        {
+            parameters[int(i)]->beginChangeGesture();
+            parameters[int(i)]->setValueNotifyingHost(values[i]);
+            parameters[int(i)]->endChangeGesture();
+        }
+    applyingUndo = false;
+}
+void LowlineProcessor::recordUndo(const String &name, std::vector<float> before)
+{
+    if (!MessageManager::existsAndIsCurrentThread()) return;
+    auto after = parameterSnapshot();
+    if (after == before) return;
+    undo.beginNewTransaction(name);
+    undo.perform(new SnapshotAction(*this, std::move(before), std::move(after)), name);
+}
+void LowlineProcessor::parameterGestureChanged(int, bool starting)
+{
+    // Gestures come from the editor's attachments (message thread); MIDI, automation and tap
+    // tempo change values without gestures, so they never enter the history.
+    if (applyingUndo || !MessageManager::existsAndIsCurrentThread()) return;
+    if (starting)
+    {
+        if (gestureDepth++ == 0) gestureBefore = parameterSnapshot();
+    }
+    else if (gestureDepth > 0 && --gestureDepth == 0)
+        recordUndo("Edit", std::move(gestureBefore));
 }

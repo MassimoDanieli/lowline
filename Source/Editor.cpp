@@ -64,7 +64,6 @@ LowlineEditor::LowlineEditor(LowlineProcessor &p) : AudioProcessorEditor(p), pro
     {
         auto k = std::make_unique<Knob>();
         k->slider.setSliderStyle(Slider::RotaryHorizontalVerticalDrag);
-        k->slider.onDragStart = [this,id] { proc.undo.beginNewTransaction(id); };
         k->slider.setTextBoxStyle(Slider::TextBoxBelow, false, 88, 20);
         k->slider.setTextValueSuffix(suffix);
         k->slider.setDoubleClickReturnValue(true, proc.state.getParameter(id)->convertFrom0to1(

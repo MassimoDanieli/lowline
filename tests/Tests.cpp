@@ -596,17 +596,33 @@ int main(int argc, char **argv)
             set(comparison,"compOn",0);set(comparison,"blend",0);set(comparison,"output",0);
             comparison.setPresetDetails("Walking bass","jazz,clean","A clean practice sound");comparison.markClean();
             require(!comparison.isDirty(),"saved fingerprint initially clean");
-            comparison.measuredRms=-20;comparison.storeComparison(0);set(comparison,"bass",6);comparison.measuredRms=-14;comparison.storeComparison(1);
+            auto playLevel=[&](float level,int blocks){for(int j=0;j<blocks;++j){for(int ch=0;ch<2;++ch)FloatVectorOperations::fill(block.getWritePointer(ch),level,256);comparison.processBlock(block,messages);}};
+            comparison.measureLevel();playLevel(.1f,940);comparison.storeComparison(0);
+            require(std::abs(comparison.comparisonLevel(0)+20)<.2,"STORE uses a fresh measurement of the same sound");
+            set(comparison,"bass",6);comparison.storeComparison(1);
+            require(comparison.comparisonLevel(1)<-60,"STORE after a change does not reuse the old measurement");
+            playLevel(.2f,940);
+            require(std::abs(comparison.comparisonLevel(1)+14)<.2,"STORE measures the stored sound by itself");
             require(comparison.isDirty(),"parameter edit marks preset dirty");
             require(comparison.recallComparison(0),"A comparison can be recalled");wait(comparison);
             require(std::abs(comparison.state.getRawParameterValue("bass")->load())<.001,"A recall restores controls");
-            comparison.measuredRms=-14;comparison.matchComparison(0);require(std::abs(comparison.compareTrim+6)<.01,"RMS match computes bounded reference gain");
+            playLevel(.2f,940);comparison.matchComparison(0);require(std::abs(comparison.compareTrim+6)<.3,"RMS match computes bounded reference gain");
             comparison.measuredRms=-100;comparison.compareTrim=0;comparison.matchComparison(0);require(comparison.compareTrim==0,"silence cannot cause positive auto gain");
             comparison.measureLevel();for(int j=0;j<940;++j){for(int ch=0;ch<2;++ch)FloatVectorOperations::fill(block.getWritePointer(ch),.1f,256);comparison.processBlock(block,messages);}
             require(comparison.measureRemaining==0&&std::abs(comparison.measuredRms+20)<.2,"five-second meter measures actual processed RMS");
-            comparison.undo.clearUndoHistory();comparison.undo.beginNewTransaction("Bass");set(comparison,"bass",4);comparison.state.copyState();
-            require(comparison.undo.canUndo(),"parameter changes enter undo history");comparison.undo.undo();
+            comparison.undo.clearUndoHistory();
+            auto *bassParameter=comparison.state.getParameter("bass");
+            bassParameter->beginChangeGesture();set(comparison,"bass",4);bassParameter->endChangeGesture();
+            require(comparison.undo.canUndo(),"interface gestures enter undo history");comparison.undo.undo();
             require(std::abs(comparison.state.getRawParameterValue("bass")->load())<.01,"undo restores parameter");
+            comparison.undo.clearUndoHistory();
+            {MidiBuffer cc;cc.addEvent(MidiMessage::controllerEvent(1,11,30),0);comparison.processBlock(block,cc);}
+            require(!comparison.undo.canUndo(),"MIDI changes stay out of the undo history");
+            bassParameter->beginChangeGesture();set(comparison,"bass",3);bassParameter->endChangeGesture();
+            require(comparison.recallComparison(1),"B recall");wait(comparison);
+            require(comparison.undo.canUndo()&&std::abs(comparison.state.getRawParameterValue("bass")->load()-6)<.01,"A/B recall keeps the undo history");
+            comparison.undo.undo();
+            require(std::abs(comparison.state.getRawParameterValue("bass")->load()-3)<.01,"A/B recall itself can be undone");
             auto saved=temp.getChildFile("named.lowline");comparison.savePreset(saved);comparison.setPresetDetails("Other","","");comparison.openPreset(saved);wait(comparison);
             require(comparison.presetName()=="Walking bass"&&comparison.presetTags().contains("jazz"),"preset name tags and description persist");
         }

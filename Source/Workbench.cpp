@@ -635,14 +635,16 @@ void LowlineWorkbench::timerCallback()
     {
         title =
             it() ? "Confronta due suoni, con un livello misurato" : "Compare two sounds with measured levels";
-        body = (it() ? "1. Suona una frase per MISURA, poi MEMORIZZA A. Ripeti per B.\n2. Richiama A o B; "
-                       "misura la stessa frase e allinea al riferimento.\nLa compensazione e RMS, non LUFS; "
-                       "usa lo stesso materiale e livello di ingresso.\nA/B include controlli e percorsi "
-                       "delle catture, non copie dei file.\n"
-                     : "1. Play a phrase during MEASURE, then STORE A. Repeat for B.\n2. Recall A or B; "
-                       "measure the same phrase and match to the reference.\nCompensation is RMS, not LUFS; "
-                       "use the same material and input level.\nA/B includes controls and capture paths, not "
-                       "copies of the files.\n") +
+        body = (it() ? "1. MEMORIZZA A e suona la frase per 5 s: il livello di A si misura da solo. Ripeti per B.\n"
+                       "2. Richiama A o B, risuona la stessa frase (misura automatica) e allinea al riferimento.\n"
+                       "La compensazione e RMS, non LUFS; usa lo stesso materiale e livello di ingresso.\n"
+                       "A/B include controlli e percorsi delle catture; ANNULLA torna al suono precedente.\n"
+                     : "1. STORE A and play the phrase for 5 s: A's level is measured by itself. Repeat for B.\n"
+                       "2. Recall A or B, play the same phrase again (measured automatically) and match.\n"
+                       "Compensation is RMS, not LUFS; use the same material and input level.\n"
+                       "A/B includes controls and capture paths; UNDO returns to the previous sound.\n") +
+               String("A: ") + (proc.comparisonLevel(0) > -60 ? String(proc.comparisonLevel(0), 1) + " dB" : String("--")) +
+               "   B: " + (proc.comparisonLevel(1) > -60 ? String(proc.comparisonLevel(1), 1) + " dB" : String("--")) +
                String("\nRMS: ") + String(proc.measuredRms.load(), 1) + " dB   /   " +
                String(proc.measureRemaining > 0 ? "MEASURING..." : "READY") + "   /   trim " +
                String(proc.compareTrim.load(), 1) + " dB";

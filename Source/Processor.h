@@ -10,7 +10,9 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_dsp/juce_dsp.h>
 #include <thread>
-class LowlineProcessor : public juce::AudioProcessor, public juce::AsyncUpdater
+class LowlineProcessor : public juce::AudioProcessor,
+                          public juce::AsyncUpdater,
+                          private juce::AudioProcessorParameter::Listener
 {
   public:
     LowlineProcessor();
@@ -42,6 +44,13 @@ class LowlineProcessor : public juce::AudioProcessor, public juce::AsyncUpdater
     double audioRate() const { return rate; }
     int audioBlock() const { return maxBlock; }
     void storeComparison(int index);
+    // Undo covers what you do in the interface (knob, button and menu gestures, factory programs,
+    // A/B recall) - never MIDI, host automation or tap tempo.
+    std::vector<float> parameterSnapshot() const;
+    void applySnapshot(const std::vector<float> &);
+    void recordUndo(const juce::String &name, std::vector<float> before);
+    std::atomic<uint32_t> stateVersion{0}; // bumps on every parameter or capture change
+    float comparisonLevel(int i) const { return i >= 0 && i < 2 ? comparisonRms[size_t(i)].load() : -100.f; }
     bool recallComparison(int index);
     void matchComparison(int reference);
     bool hasComparison(int index) const { return index >= 0 && index < 2 && comparison[size_t(index)].getSize() > 0; }
@@ -159,7 +168,20 @@ class LowlineProcessor : public juce::AudioProcessor, public juce::AsyncUpdater
     std::array<double, 3> tapIntervals{};
     int tapCount = 0;
     std::array<juce::MemoryBlock, 2> comparison;
-    std::array<float, 2> comparisonRms{-100, -100};
+    std::array<std::atomic<float>, 2> comparisonRms{-100.f, -100.f};
+    std::atomic<int> measureFor{-1};
+    std::atomic<uint32_t> measureStartVersion{0}, measuredVersion{0xffffffffu};
+    std::atomic<bool> measureAfterLoad{false};
+    bool measurementFresh() const { return measureRemaining == 0 && measuredVersion.load() == stateVersion.load(); }
+    void parameterValueChanged(int, float) override { ++stateVersion; }
+    void parameterGestureChanged(int, bool starting) override;
+    int gestureDepth = 0;
+    bool applyingUndo = false;
+    std::vector<float> gestureBefore;
+    std::atomic<bool> clearUndoPending{false};
+    void restoreState(const void *, int, bool keepUndo);
+    void applyProgram(int);
+    std::atomic<int> programNamePending{-1};
     juce::String cleanSignature;
     std::atomic<bool> cleanWhenReady{false};
     std::atomic<bool> measureRequested{false};
