@@ -884,6 +884,16 @@ int main(int argc, char **argv)
             auto seeked = onsets(1, 1.6);
             require(!seeked.empty() && std::abs(seeked[0] - int(.15 * 48000)) < 260, "after a seek the next click lands on the next beat");
         }
+        {
+            // pluginval (strictness 10): an automated in-between switch value must not survive a restore.
+            LowlineProcessor v;
+            auto *ping = v.state.getParameter("ping");
+            ping->setValueNotifyingHost(1.f);
+            MemoryBlock saved; v.getStateInformation(saved);
+            ping->setValueNotifyingHost(.77f);
+            v.setStateInformation(saved.getData(), int(saved.getSize()));
+            require(ping->getValue() == 1.f, "state restore writes switch values exactly");
+        }
         temp.deleteRecursively();
         std::cout << "All audio checks passed.\n";
         return 0;

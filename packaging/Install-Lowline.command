@@ -19,5 +19,7 @@ install_bundle 'VST3/Lowline.vst3' "$HOME/Library/Audio/Plug-Ins/VST3/Lowline.vs
 echo 'Installato! / Installed!'
 echo 'App: ~/Applications/Lowline.app'
 echo 'Le versioni precedenti sono conservate con suffisso .backup-data. / Old versions are backed up.'
-echo 'App non notarizzata: consulta README-INSTALL.txt. / Not notarised: see README-INSTALL.txt.'
+if ! spctl --assess --type execute "$HOME/Applications/Lowline.app" >/dev/null 2>&1; then
+  echo 'App non notarizzata: consulta README-INSTALL.txt. / Not notarised: see README-INSTALL.txt.'
+fi
 read -r -p 'Premi Invio per chiudere / Press Enter to close: '

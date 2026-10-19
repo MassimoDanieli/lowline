@@ -817,6 +817,15 @@ void LowlineProcessor::restoreState(const void *data, int size, bool keepUndo)
             tree.addChild(child, -1, nullptr);
         }
     state.replaceState(tree);
+    // APVTS skips parameters whose stored value already equals the restored one, which can leave
+    // an automated in-between value (e.g. a switch at 0.77) in place: write every value explicitly.
+    for (auto *parameter : midiTargets)
+    {
+        const auto child = tree.getChildWithProperty("id", parameter->paramID);
+        if (!child.isValid()) continue;
+        const float target = parameter->convertTo0to1(float(child.getProperty("value")));
+        if (std::abs(parameter->getValue() - target) > 1.e-6f) parameter->setValueNotifyingHost(target);
+    }
     if (!keepUndo)
     {
         // A loaded preset or host session starts a fresh history (UndoManager: message thread only).

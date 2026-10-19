@@ -1,4 +1,4 @@
-LOWLINE 0.3.0 / INSTALLAZIONE — INSTALLATION
+LOWLINE / INSTALLAZIONE — INSTALLATION
 
 ITALIANO
 Mac: apri il DMG o estrai lo ZIP. Chiudi Lowline e la tua DAW.
@@ -8,8 +8,8 @@ VST3/Lowline.vst3 in ~/Library/Audio/Plug-Ins/VST3.
 In alternativa, Install-Lowline.command esegue queste copie per il tuo utente,
 senza sudo, conservando una copia di eventuali versioni precedenti.
 
-L'app e l'installer non sono firmati con Developer ID o notarizzati.
-Se macOS blocca l'apertura, verifica che il pacchetto provenga dalla Release
+Le note della Release dicono se l'app e firmata con Developer ID e notarizzata da
+Apple: in quel caso si apre senza avvisi. Se non lo e e macOS blocca l'apertura, verifica che il pacchetto provenga dalla Release
 ufficiale del progetto; consulta Privacy e sicurezza nelle Impostazioni di
 Sistema per l'opzione di apertura consentita da macOS. Non disattivare Gatekeeper.
 Se l'installer viene bloccato, usa la copia manuale descritta sopra.
@@ -27,8 +27,8 @@ VST3/Lowline.vst3 to ~/Library/Audio/Plug-Ins/VST3.
 Alternatively, Install-Lowline.command makes these copies for your user,
 without sudo, retaining backups of any existing versions.
 
-The app and installer are not Developer-ID signed or notarised.
-If macOS blocks opening, verify that the package is from the project's official
+The Release notes state whether the app is Developer-ID signed and notarised by
+Apple: then it opens without warnings. If not, and macOS blocks opening, verify that the package is from the project's official
 Release, then consult Privacy & Security in System Settings for the opening
 option allowed by macOS. Do not disable Gatekeeper. Use manual copying if the
 installer is blocked.
