@@ -597,7 +597,8 @@ void LowlineProcessor::workerLoop()
                 const int pc = requestedProgram.exchange(-1);
                 if (pc >= 0)
                 {
-                    const String path = programAssignment(pc);
+                    const String path = programAssignment(pc).isEmpty() ? String()
+                        : lowline::platform::relocate(File(programAssignment(pc))).getFullPathName();
                     MemoryBlock bytes;
                     if (path.isNotEmpty() && buildPreset(File(path), bytes))
                     {
@@ -847,6 +848,7 @@ void LowlineProcessor::restoreState(const void *data, int size, bool keepUndo)
         for (int i = 0; i < 4; ++i)
         {
             auto path = tree.getProperty("file" + String(i)).toString();
+            if (path.isNotEmpty()) path = lowline::platform::relocate(File(path)).getFullPathName(); // iOS container moved
             scene.files[size_t(i)] = path.isNotEmpty() && File(path).existsAsFile() ? File(path) : File{};
             if (path.isNotEmpty() && !File(path).existsAsFile()) scene.warning += "File not found: " + File(path).getFileName() + "; ";
         }

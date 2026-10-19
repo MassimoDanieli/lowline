@@ -3,6 +3,7 @@
 #include "Capture.h"
 #include "Tuner.h"
 #include "Studio.h"
+#include "Platform.h"
 #include <juce_cryptography/juce_cryptography.h>
 #include <NAM/get_dsp.h>
 #include <condition_variable>

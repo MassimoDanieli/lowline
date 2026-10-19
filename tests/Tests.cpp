@@ -894,6 +894,37 @@ int main(int argc, char **argv)
             v.setStateInformation(saved.getData(), int(saved.getSize()));
             require(ping->getValue() == 1.f, "state restore writes switch values exactly");
         }
+        {
+            // iOS file handling, simulated on the desktop: picked files are copied into Documents,
+            // and paths from an older app container are re-rooted.
+            auto docs = temp.getChildFile("ipad-documents");
+            lowline::platform::documentsForTests() = docs;
+            lowline::platform::sandboxedForTests() = true;
+            auto outside = temp.getChildFile("icloud").getChildFile("bass amp.nam");
+            outside.getParentDirectory().createDirectory();
+            outside.replaceWithText(R"({"version":"0.5.4","architecture":"Linear","config":{"receptive_field":1,"bias":false},"weights":[0.5],"sample_rate":48000})");
+            const auto copied = lowline::platform::adopt(URL(outside), "Captures");
+            require(copied.existsAsFile() && copied.isAChildOf(docs) && copied.getFileName() == "bass amp.nam",
+                    "iOS: a picked file is copied into Documents/Captures");
+            require(lowline::platform::adopt(URL(outside), "Captures") == copied, "iOS: picking the same file again reuses the copy");
+            auto other = temp.getChildFile("elsewhere").getChildFile("bass amp.nam");
+            other.getParentDirectory().createDirectory();
+            other.replaceWithText("{}");
+            const auto second = lowline::platform::adopt(URL(other), "Captures");
+            require(second.existsAsFile() && second != copied, "iOS: a different file with the same name gets its own copy");
+            const File oldContainer("/var/mobile/Containers/Data/Application/OLD-UUID/Documents/Captures/bass amp.nam");
+            require(lowline::platform::relocate(oldContainer) == copied, "iOS: a path from an older app container is re-rooted");
+            LowlineProcessor ipad;
+            ipad.prepareToPlay(48000, 256);
+            auto tree = ipad.state.copyState();
+            tree.setProperty("file1", oldContainer.getFullPathName(), nullptr);
+            MemoryBlock bytes; AudioProcessor::copyXmlToBinary(*tree.createXml(), bytes);
+            ipad.setStateInformation(bytes.getData(), int(bytes.getSize())); wait(ipad);
+            require(ipad.slotName(LowlineProcessor::Amp) == "bass amp.nam", "iOS: a preset saved before an app update still finds its capture");
+            lowline::platform::sandboxedForTests() = false;
+            lowline::platform::documentsForTests() = File{};
+            require(lowline::platform::adopt(URL(outside), "Captures") == outside, "desktop: picked files are used in place");
+        }
         temp.deleteRecursively();
         std::cout << "All audio checks passed.\n";
         return 0;

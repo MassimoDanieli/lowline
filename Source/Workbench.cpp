@@ -312,6 +312,7 @@ void LowlineWorkbench::resized()
         layoutButton("next", 317, 458, 145);
         layoutButton("favourite", 472, 458, 145);
         layoutButton("reveal", 627, 458, 147);
+        buttons.at("reveal")->setVisible(!lowline::platform::sandboxed()); // no Finder on iPad
         layoutButton("add", 22, 510, 170);
         layoutButton("folder", 202, 510, 220);
         layoutButton("remove", 432, 510, 230);
@@ -442,9 +443,10 @@ void LowlineWorkbench::activate(int direction)
         row = (row + direction + int(visible.size())) % int(visible.size());
     list.selectRow(row);
     auto &e = items[size_t(visible[size_t(row)])];
-    File f(e.path);
+    File f = lowline::platform::relocate(File(e.path)); // iOS container moved after an update
     if (!f.existsAsFile())
         return;
+    e.path = f.getFullPathName();
     if (f.hasFileExtension("lowline"))
     {
         proc.openPreset(f);
@@ -497,8 +499,20 @@ void LowlineWorkbench::saveCatalog()
 }
 void LowlineWorkbench::chooseFiles(bool folder)
 {
+    if (folder && lowline::platform::sandboxed())
+    {
+        // iPad: the library folder is Lowline's own Documents ("On My iPad > Lowline" in Files).
+        {
+            std::lock_guard l(scanLock);
+            scanFolder = lowline::platform::documents();
+            ++requestedScan;
+        }
+        scanning = true;
+        notify();
+        return;
+    }
     chooser = std::make_unique<FileChooser>(it() ? "Aggiungi alla libreria" : "Add to library", File{},
-                                            "*.nam;*.wav;*.aif;*.aiff;*.lowline");
+                                            lowline::platform::pickerFilter("*.nam;*.wav;*.aif;*.aiff;*.lowline"));
     Component::SafePointer<LowlineWorkbench> safe(this);
     chooser->launchAsync(
         FileBrowserComponent::openMode |
@@ -518,7 +532,7 @@ void LowlineWorkbench::chooseFiles(bool folder)
                 safe->notify();
             }
             else
-                safe->addFiles(c.getResults());
+                safe->addFiles(lowline::platform::adoptAll(c, "Library"));
         });
 }
 void LowlineWorkbench::run()
@@ -561,18 +575,26 @@ void LowlineWorkbench::run()
 void LowlineWorkbench::chooseBacking()
 {
     chooser = std::make_unique<FileChooser>(it() ? "Carica base" : "Load backing track", File{},
-                                            "*.wav;*.aiff;*.aif");
+                                            lowline::platform::pickerFilter("*.wav;*.aiff;*.aif"));
     Component::SafePointer<LowlineWorkbench> safe(this);
     chooser->launchAsync(FileBrowserComponent::openMode | FileBrowserComponent::canSelectFiles,
                          [safe](const FileChooser &c) {
-                             if (safe && c.getResult().existsAsFile())
-                                 safe->proc.studio.load(c.getResult(), 1);
+                             const auto f = lowline::platform::adoptFirst(c, "Backing");
+                             if (safe && f.existsAsFile())
+                                 safe->proc.studio.load(f, 1);
                          });
 }
 void LowlineWorkbench::record()
 {
     if (proc.studio.recording)
         return;
+    if (lowline::platform::sandboxed())
+    {
+        // iPad: takes go to Documents/Recordings, no dialog (a save picker cannot stream a long take).
+        proc.studio.startRecording(lowline::platform::folder("Recordings")
+            .getChildFile("Lowline-" + Time::getCurrentTime().formatted("%Y%m%d-%H%M%S") + ".wav"));
+        return;
+    }
     auto f = File::getSpecialLocation(File::userDocumentsDirectory)
                  .getChildFile("Lowline-" + Time::getCurrentTime().formatted("%Y%m%d-%H%M%S") + ".wav");
     chooser = std::make_unique<FileChooser>(
