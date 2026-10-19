@@ -2,6 +2,14 @@
 
 A free, open-source native bass rig for macOS (Apple Silicon + Intel), Windows x64 and Linux x64. Standalone and VST3; AU is also built for macOS. Original project for Massimo Danieli, not affiliated with NamRay, Neural Amp Modeler or TONE3000.
 
+## ⬇️ Scarica / Download
+
+**[🍎 Mac — Apple Silicon + Intel](https://github.com/MassimoDanieli/lowline/releases/download/v0.2.0/Lowline-macOS-universal.zip)** · **[Windows x64](https://github.com/MassimoDanieli/lowline/releases/download/v0.2.0/Lowline-Windows-x64.zip)** · **[Linux x64](https://github.com/MassimoDanieli/lowline/releases/download/v0.2.0/Lowline-Linux-x64.tar.gz)**
+
+App pronta all'uso: non serve compilare. / Ready-built app: no compilation needed.
+
+[All downloads / Tutti i download](https://github.com/MassimoDanieli/lowline/releases/latest) · [Guida italiana](docs/HELP_IT.md) · [English guide](docs/HELP_EN.md)
+
 ![Lowline rig](preview.png)
 
 ## New in 0.2
@@ -24,15 +32,9 @@ The rig also includes compression, saturation booster, NAM pedal and amp slots, 
 
 ## Download and quick start
 
-Verified **0.2.0** packages ([successful build and tests](https://github.com/MassimoDanieli/lowline/actions/runs/39152945390)):
+Download a package using the links above, or open [Releases](https://github.com/MassimoDanieli/lowline/releases/latest) and expand **Assets**. Choose the file for your operating system, not the automatically generated “Source code” archives. Extract the downloaded archive. Public release downloads do not require a GitHub account and do not have the 30-day Actions artifact expiry.
 
-- [Download macOS universal — Apple Silicon + Intel](https://github.com/MassimoDanieli/lowline/actions/runs/39152945390/artifacts/12146091435)
-- [Download Windows x64](https://github.com/MassimoDanieli/lowline/actions/runs/39152945390/artifacts/12146150976)
-- [Download Linux x64](https://github.com/MassimoDanieli/lowline/actions/runs/39152945390/artifacts/12145338897)
-
-GitHub sign-in may be required to download artifacts.
-
-Native packages are built in [GitHub Actions](https://github.com/MassimoDanieli/lowline/actions). Choose a successful **Native builds** run and download **Lowline-macOS-universal**, **Lowline-Windows-x64** or **Lowline-Linux-x64** under Artifacts. Unpack the outer artifact ZIP, then the platform archive inside. Artifacts expire after 30 days.
+The 0.2.0 packages passed [builds and regression tests on all three platforms](https://github.com/MassimoDanieli/lowline/actions/runs/39152945390).
 
 On Mac, run the standalone app or install the AU/VST3 bundle in your user's Audio/Plug-Ins folders. The app is not Developer-ID signed or notarised. See the guide for installation and audio setup.
 

@@ -1,0 +1,62 @@
+name: Publish verified Lowline 0.2
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/release-0.2.yml]
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: release-0.2
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Verify tested source and download packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api repos/$GH_REPO/actions/runs/39152945390 > run.json
+          python3 - <<'PY'
+          import json
+          r = json.load(open('run.json'))
+          assert r['conclusion'] == 'success'
+          assert r['head_sha'] == '9efdb3be8156738f816bcf9968ae0ffc5d46eafc'
+          assert r['event'] == 'push'
+          PY
+          gh run download 39152945390 -n Lowline-macOS-universal -D packages
+          gh run download 39152945390 -n Lowline-Windows-x64 -D packages
+          gh run download 39152945390 -n Lowline-Linux-x64 -D packages
+          cd packages
+          sha256sum Lowline-macOS-universal.zip Lowline-Windows-x64.zip Lowline-Linux-x64.tar.gz > SHA256SUMS.txt
+      - name: Publish downloadable release
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > notes.md <<'NOTES'
+          ## Scarica Lowline / Download Lowline
+          In **Assets** scegli il file del tuo sistema. / Under **Assets**, choose your platform:
+          - **Lowline-macOS-universal.zip**: Mac Apple Silicon + Intel; standalone, AU and VST3.
+          - **Lowline-Windows-x64.zip**: Windows 64-bit; standalone and VST3.
+          - **Lowline-Linux-x64.tar.gz**: Linux 64-bit; standalone and VST3.
+
+          Non serve compilare il codice. / No compilation required.
+          The automatically generated Source code archives are for developers.
+
+          [Guida italiana](https://github.com/MassimoDanieli/lowline/blob/main/docs/HELP_IT.md) · [English guide](https://github.com/MassimoDanieli/lowline/blob/main/docs/HELP_EN.md)
+
+          Free, open-source bass rig with NAM pedal/amp, cabinet IR, compressor, booster, five-band EQ, clean blend/filter, gate, tuner, stereo delay and convolution reverb. Includes MIDI learn, portable preset export and capture crossfades. NAM captures and IRs are not bundled.
+
+          Packages come from the successful three-platform [build and regression tests](https://github.com/MassimoDanieli/lowline/actions/runs/39152945390), source commit 9efdb3be8156738f816bcf9968ae0ffc5d46eafc. Hardware latency and listening quality still require real-world testing. The Mac app is not Developer-ID signed or notarised; see the installation guide.
+          NOTES
+          if ! gh release view v0.2.0 >/dev/null 2>&1; then
+            gh release create v0.2.0 --target 9efdb3be8156738f816bcf9968ae0ffc5d46eafc --title 'Lowline 0.2.0 — Mac, Windows & Linux' --notes-file notes.md --draft
+          fi
+          gh release upload v0.2.0 packages/Lowline-macOS-universal.zip packages/Lowline-Windows-x64.zip packages/Lowline-Linux-x64.tar.gz packages/SHA256SUMS.txt --clobber
+          gh release edit v0.2.0 --draft=false --latest
