@@ -169,9 +169,8 @@ String LowlineProcessor::midiDescription() const
     }
     return result;
 }
-void LowlineProcessor::tapTempo()
+void LowlineProcessor::tapTempoAt(double now)
 {
-    const double now = Time::getMillisecondCounterHiRes();
     float bpm = 0;
     {
         const SpinLock::ScopedLockType guard(tapLock);

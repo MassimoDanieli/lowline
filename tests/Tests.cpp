@@ -698,8 +698,14 @@ int main(int argc, char **argv)
             r.momentarySwitches = false;
 
             set(r, "sync", 0);
-            r.tapTempo(); Thread::sleep(500); r.tapTempo(); Thread::sleep(500); r.tapTempo();
-            require(std::abs(r.state.getRawParameterValue("time")->load() - 500) < 40, "TAP without sync sets the delay time");
+            // Explicit timestamps: CI runners (macOS especially) oversleep, so sleep-based taps are flaky.
+            const double t0 = Time::getMillisecondCounterHiRes() + 10000;
+            r.tapTempoAt(t0); r.tapTempoAt(t0 + 500); r.tapTempoAt(t0 + 1000);
+            require(std::abs(r.state.getRawParameterValue("time")->load() - 500) < 1, "TAP without sync sets the delay time");
+            r.tapTempoAt(t0 + 1520); r.tapTempoAt(t0 + 2000);
+            require(std::abs(r.state.getRawParameterValue("tempo")->load() - 120) < 2, "TAP averages slightly uneven taps");
+            r.tapTempoAt(t0 + 5000);
+            require(std::abs(r.state.getRawParameterValue("tempo")->load() - 120) < 2, "a tap after a long pause is ignored");
 
             set(r, "tunerOn", 1); set(r, "tunerMute", 1);
             AudioBuffer<float> hb(2, 256);

@@ -67,7 +67,8 @@ class LowlineProcessor : public juce::AudioProcessor, public juce::AsyncUpdater
     juce::String slotName(Slot) const;
     juce::String status() const;
     void savePreset(const juce::File &, bool portable = false);
-    void tapTempo();
+    void tapTempo() { tapTempoAt(juce::Time::getMillisecondCounterHiRes()); }
+    void tapTempoAt(double nowMs); // explicit clock: deterministic tests
     void armMidiLearn(int target) { learnTarget = target; }
     void resetMidiMappings();
     void clearMidiTarget(int target);
