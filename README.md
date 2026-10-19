@@ -51,7 +51,7 @@ The rig also includes compression, saturation booster, NAM pedal and amp slots, 
 
 Download a package using the links above, or open [Releases](https://github.com/MassimoDanieli/lowline/releases/latest) and expand **Assets**. Choose the file for your operating system, not the automatically generated “Source code” archives. Extract the downloaded archive. Public release downloads do not require a GitHub account and do not have the 30-day Actions artifact expiry.
 
-Release 0.3.0 is published automatically only after all three native build and regression-test jobs succeed. [Build history](https://github.com/MassimoDanieli/lowline/actions).
+The 0.3.0 packages passed [native builds and regression tests on macOS, Windows and Linux](https://github.com/MassimoDanieli/lowline/actions/runs/39188625927). Release publication is gated on all three jobs succeeding.
 
 On Mac, run the standalone app or install the AU/VST3 bundle in your user's Audio/Plug-Ins folders. The app is not Developer-ID signed or notarised. See the guide for installation and audio setup.
 

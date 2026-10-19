@@ -1,5 +1,7 @@
 # Validation — Lowline 0.3.0
 
+Verified source: `e6866c64e7505d48c91050501b9eab242e8d0356`. [Native builds run 39188625927](https://github.com/MassimoDanieli/lowline/actions/runs/39188625927) passed compilation and regression tests on macOS universal, Windows x64 and Linux x64. The local screenshot run passed 170 assertions, including navigation/render checks.
+
 ## Verification scope
 
 The regression executable uses the actual JUCE processor and NAM core, with synthetic audio and fixture captures. Local Release builds cover Linux standalone, VST3 and tests. GitHub's Native builds workflow builds/tests macOS universal, Windows x64 and Linux x64; the 0.3 release job depends on all three succeeding. Mac architecture checks verify arm64 and x86_64 in the standalone executable; tests run on the runner's own architecture.
