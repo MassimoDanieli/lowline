@@ -1,3 +1,30 @@
+# 0.3.2
+
+Second review round. Every behaviour change has a regression test; CI now also runs pluginval (strictness 10) on all three systems and auval on macOS.
+
+**Sound**
+- BYPASS crossfades in about 15 ms instead of switching (no click); delay and reverb tails still fade out.
+- BOOST uses anti-aliased saturation (first-order ADAA tanh: more than 10 dB less aliasing at high boost) and fades in/out.
+- BASS and TREBLE are shelves (below 100 Hz / above 3.5 kHz); all EQ gains and frequencies glide instead of stepping. Presets that boost BASS get a little more deep low end than before.
+- A mono cab IR uses one convolution instead of two.
+
+**Undo and A/B**
+- UNDO covers what you do in the interface (knobs, buttons, menus, factory programs, A/B recalls): MIDI, automation and TAP no longer pollute it. Opening a preset starts a fresh history; A/B recall keeps it and can be undone.
+- STORE A/B attaches a fresh level measurement or measures the stored sound by itself; recall re-measures; MATCH refuses stale measurements.
+- A MIDI Program Change no longer writes the preset name from the audio thread.
+
+**MIDI**
+- The MIDI map, footswitch mode and Program Change bank are global controller settings (one file shared by the app and every plugin instance, saved automatically). Presets no longer carry them, so opening someone else's preset keeps your setup. The first time, the map from your last 0.3 preset/session is adopted.
+
+**Practice**
+- BEAT 1 HERE locks the metronome to the backing: clicks stay in time at any speed, after seeks and in loops.
+- Backing limit really is 10 minutes (the hidden 16M-sample cap is gone; a 768 MB budget protects very slow speeds); mono files stay mono; time-stretching uses about a third less memory; seeks are never lost.
+
+**Window and distribution**
+- The window is resizable (50-200 %) with fixed proportions, fits the screen on first opening and remembers its size.
+- State restore writes every parameter exactly (found by pluginval).
+- Optional Developer ID signing and notarisation in CI when the Apple secrets are configured; release notes say whether a build is notarised.
+
 # 0.3.1
 
 Fixes from a code review; each behaviour change has a regression test in `tests/Tests.cpp`.
