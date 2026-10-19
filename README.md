@@ -115,7 +115,7 @@ The tuner is monophonic and can be confused by strong harmonics/noise. Gate, EQ 
 
 Software tests do not establish Scarlett round-trip latency, performance with arbitrary neural captures, DAW validation or real-world listening quality. See VALIDATION.md for what was actually checked.
 
-Practice settings, A/B snapshots and match trim are temporary and are not saved in rig presets. The metronome is independent of host/backing tempo. Time stretching is offline WSOLA and can smear transients. Backing files are limited to 10 minutes and 16M samples per channel. Recorded FX is before the final monitor limiter/mute; float WAVs can exceed 0 dBFS. Check the dropped-block counter and audition recorded files.
+Practice settings, A/B snapshots and match trim are temporary and are not saved in rig presets. The metronome can lock to the backing (BEAT 1 HERE) and is independent of host tempo. Time stretching is offline WSOLA and can smear transients. Backing files are limited to 10 minutes (and a 768 MB decode budget at very slow speeds). Recorded FX is before the final monitor limiter/mute; float WAVs can exceed 0 dBFS. Check the dropped-block counter and audition recorded files.
 
 ## License
 

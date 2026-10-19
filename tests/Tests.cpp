@@ -837,6 +837,47 @@ int main(int argc, char **argv)
             const double plain = aliasAt3k(false), smooth = aliasAt3k(true);
             require(lowline::toDb(float(smooth)) < lowline::toDb(float(plain)) - 10, "BOOST aliasing (9th harmonic folded to 3 kHz) drops by more than 10 dB");
         }
+        {
+            // 0.3.2 practice: stretch gain is flat, metronome follows the backing, mono tracks stay mono.
+            for (double speed : {.5, .8, 1.25})
+            {
+                auto stretched = LowlineStudio::stretch(referenceTone, speed, 48000);
+                const int a = 4000, n = stretched.getNumSamples() - 8000;
+                require(std::abs(stretched.getRMSLevel(0, a, n) - .2f / std::sqrt(2.f)) < .006f, "stretch keeps the level without a weight buffer");
+            }
+            const auto silentFile = temp.getChildFile("silent-mono.wav");
+            {
+                AudioBuffer<float> silence(1, 48000 * 6); silence.clear();
+                WavAudioFormat wav; std::unique_ptr<AudioFormatWriter> writer(wav.createWriterFor(new FileOutputStream(silentFile), 48000, 1, 24, {}, 0));
+                require(writer && writer->writeFromAudioSampleBuffer(silence, 0, silence.getNumSamples()), "write silent backing");
+            }
+            auto onsets = [&](float speed, double seekTo)
+            {
+                LowlineStudio studio; studio.prepare(48000, 256); studio.load(silentFile, speed);
+                for (int i = 0; i < 500 && studio.loading; ++i) Thread::sleep(10);
+                studio.bpm = 120; studio.beatOne = .25; studio.click = true; studio.playing = true;
+                if (seekTo >= 0) studio.seek(seekTo);
+                std::vector<int> found; AudioBuffer<float> block(2, 256); int lastSound = -100000;
+                for (int k = 0; k < 600 && found.size() < 3; ++k)
+                {
+                    block.clear(); studio.mix(block, 0, 256, 2);
+                    for (int i = 0; i < 256; ++i)
+                        if (std::abs(block.getSample(0, i)) > 1.e-6f)
+                        {
+                            if (k * 256 + i - lastSound > 4000) found.push_back(k * 256 + i); // a new click
+                            lastSound = k * 256 + i;
+                        }
+                }
+                return found;
+            };
+            auto normal = onsets(1, -1);
+            require(normal.size() == 3 && std::abs(normal[0] - 12000) < 3 && std::abs(normal[1] - normal[0] - 24000) < 3,
+                    "metronome locks to the backing: beat 1 at the marked time, 120 BPM spacing");
+            auto slow = onsets(.5f, -1);
+            require(slow.size() == 3 && std::abs(slow[1] - slow[0] - 48000) < 3, "at half speed the clicks slow down with the backing");
+            auto seeked = onsets(1, 1.6);
+            require(!seeked.empty() && std::abs(seeked[0] - int(.15 * 48000)) < 260, "after a seek the next click lands on the next beat");
+        }
         temp.deleteRecursively();
         std::cout << "All audio checks passed.\n";
         return 0;

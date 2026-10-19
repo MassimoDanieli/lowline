@@ -25,6 +25,10 @@ class LowlineStudio : private juce::Thread
     std::atomic<float> backingGain{.35f}, clickGain{.12f}, bpm{80}, speed{1};
     std::atomic<int> accent{1}, beats{4}, beatDisplay{0};                   // 0 none, 1 first, 2 beats 2/4
     std::atomic<double> position{0}, duration{0}, loopStart{0}, loopEnd{0}; // seconds in original file
+    // Time of a downbeat in the backing file (seconds, original speed); < 0 = metronome runs free.
+    // While the backing plays, clicks follow its position: speed changes, seeks and loops stay in time.
+    std::atomic<double> beatOne{-1};
+    static constexpr double maxSeconds = 600, maxMemoryBytes = 768.0 * 1024 * 1024;
     std::atomic<int> dropped{0};
     std::atomic<int64_t> recordedSamples{0};
     std::atomic<double> sampleRate{48000};
@@ -63,6 +67,7 @@ class LowlineStudio : private juce::Thread
     {
         requestedPosition = std::max(0.0, seconds);
     }
+    void setBeatOneHere() { beatOne = position.load(); }
     bool startRecording(const juce::File &base)
     {
         stopRecording();
@@ -155,7 +160,8 @@ class LowlineStudio : private juce::Thread
         juce::SpinLock::ScopedTryLockType guard(audioLock);
         // A failed publication try-lock skips backing only, never the bass.
         const bool hasTrack = guard.isLocked() && track.getNumSamples() > 1;
-        const auto seekTo = requestedPosition.exchange(-1);
+        // Consume a seek only when it can be applied: a busy lock no longer loses it.
+        const auto seekTo = hasTrack ? requestedPosition.exchange(-1) : -1.0;
         if (hasTrack && seekTo >= 0)
             cursor = juce::jlimit(0.0, double(track.getNumSamples() - 1), seekTo / actualSpeed * fileRate);
         const double renderRate = hasTrack ? fileRate : sampleRate.load();
@@ -190,14 +196,42 @@ class LowlineStudio : private juce::Thread
                         envelope = float(std::min({1.0, std::max(0.0, (cursor - a) / (renderRate * .005)),
                                                    std::max(0.0, (b - cursor) / (renderRate * .005))}));
                     for (int c = 0; c < 2; ++c)
+                    {
+                        const int ch = std::min(c, track.getNumChannels() - 1); // mono tracks keep one channel
                         backing[c] =
-                            (track.getSample(c, index) * (1 - frac) + track.getSample(c, index + 1) * frac) *
+                            (track.getSample(ch, index) * (1 - frac) + track.getSample(ch, index + 1) * frac) *
                             backingGain.load() * envelope;
+                    }
                     cursor += step;
                 }
             }
             float metronome = 0;
-            if (click)
+            const double anchor = beatOne.load();
+            const bool following = click && hasTrack && playing && anchor >= 0;
+            if (following)
+            {
+                // Beat number from the backing position (original-file seconds).
+                const double seconds = cursor / fileRate * actualSpeed;
+                const double beatPosition = (seconds - anchor) * juce::jlimit(30.f, 300.f, bpm.load()) / 60.0;
+                const auto whole = int64_t(std::floor(beatPosition));
+                if (lastBeat == INT64_MIN || whole != lastBeat)
+                {
+                    if (lastBeat != INT64_MIN || beatPosition - double(whole) < .02)
+                    {
+                        const int n = std::max(1, beats.load());
+                        beat = int(((whole % n) + n) % n);
+                        beatDisplay = beat + 1;
+                        const bool strong = (accent == 1 && beat == 0) || (accent == 2 && (beat == 1 || beat == 3));
+                        clickHz = strong ? 1600.f : 900.f;
+                        clickRemaining = int(sampleRate * .025);
+                    }
+                    lastBeat = whole;
+                }
+                beatPhase = 0;
+            }
+            else
+                lastBeat = INT64_MIN;
+            if (click && !following)
             {
                 if (beatPhase <= 0)
                 {
@@ -210,15 +244,14 @@ class LowlineStudio : private juce::Thread
                     beatPhase += sampleRate * 60.0 / juce::jlimit(30.f, 300.f, bpm.load());
                 }
                 --beatPhase;
-                if (clickRemaining > 0)
-                {
-                    metronome = float(std::sin(clickRemaining * 2 * juce::MathConstants<double>::pi *
-                                               clickHz / sampleRate)) *
-                                float(clickRemaining / (sampleRate * .025)) * clickGain;
-                    --clickRemaining;
-                }
             }
-            else
+            if (click && clickRemaining > 0)
+            {
+                metronome = float(std::sin(clickRemaining * 2 * juce::MathConstants<double>::pi * clickHz / sampleRate)) *
+                            float(clickRemaining / (sampleRate * .025)) * clickGain;
+                --clickRemaining;
+            }
+            if (!click)
             {
                 beatPhase = 0;
                 beat = -1;
@@ -235,16 +268,22 @@ class LowlineStudio : private juce::Thread
     }
     // Offline WSOLA: fixed output hops, correlation-aligned input windows. Pitch is
     // retained; transient smearing is possible. Stereo channels share offsets.
+    static float hann(int j, int window)
+    {
+        return .5f - .5f * std::cos(float(2 * juce::MathConstants<double>::pi * (j + .5) / window));
+    }
     static juce::AudioBuffer<float> stretch(const juce::AudioBuffer<float> &input, double ratio, double sr)
     {
         if (std::abs(ratio - 1) < .001)
             return input;
-        const int window = juce::jlimit(256, 4096, int(sr * .04));
+        const int window = juce::jlimit(256, 4096, int(sr * .04)) & ~1; // even: exact Hann overlap
         const int hop = window / 2, search = int(sr * .008);
         const int length = int(input.getNumSamples() / ratio);
-        juce::AudioBuffer<float> out(2, length + window);
+        const int channels = input.getNumChannels();
+        juce::AudioBuffer<float> out(channels, length + window);
         out.clear();
-        std::vector<float> weight(size_t(length + window), 0.f);
+        // Hann windows at 50 % overlap sum to exactly 1, so only the first half window
+        // (where a single window contributes) needs normalising: no full-length weight buffer.
         int previous = 0;
         for (int dst = 0; dst < length; dst += hop)
         {
@@ -277,19 +316,18 @@ class LowlineStudio : private juce::Thread
             previous = source;
             for (int j = 0; j < window && dst + j < length && source + j < input.getNumSamples(); ++j)
             {
-                const float w =
-                    .5f - .5f * std::cos(float(2 * juce::MathConstants<double>::pi * (j + .5) / window));
-                weight[size_t(dst + j)] += w;
-                for (int c = 0; c < 2; ++c)
-                    out.addSample(c, dst + j,
-                                  input.getSample(std::min(c, input.getNumChannels() - 1), source + j) * w);
+                const float w = hann(j, window);
+                for (int c = 0; c < channels; ++c)
+                    out.addSample(c, dst + j, input.getSample(c, source + j) * w);
             }
         }
-        for (int i = 0; i < length; ++i)
-            if (weight[size_t(i)] > 1e-6f)
-                for (int c = 0; c < 2; ++c)
-                    out.setSample(c, i, out.getSample(c, i) / weight[size_t(i)]);
-        out.setSize(2, length, true);
+        for (int i = 0; i < std::min(hop, length); ++i)
+        {
+            const float w = hann(i, window);
+            if (w > 1e-3f)
+                for (int c = 0; c < channels; ++c) out.setSample(c, i, out.getSample(c, i) / w);
+        }
+        out.setSize(channels, length, true);
         return out;
     }
 
@@ -321,14 +359,23 @@ class LowlineStudio : private juce::Thread
             done = version;
             std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(f));
             if (!reader || reader->lengthInSamples < 2 || reader->numChannels > 2 ||
-                reader->lengthInSamples / reader->sampleRate > 600 || reader->lengthInSamples > 16000000)
+                reader->lengthInSamples / reader->sampleRate > maxSeconds)
             {
-                setMessage("Use mono/stereo WAV/AIFF, max 10 min / 16M samples");
+                setMessage("Use mono/stereo WAV/AIFF, max 10 min / Usa WAV/AIFF mono o stereo, max 10 min");
                 loading = false;
                 continue;
             }
-            juce::AudioBuffer<float> original(2, int(reader->lengthInSamples));
-            if (!reader->read(&original, 0, original.getNumSamples(), 0, true, true))
+            // Peak memory: the decoded file plus the stretched copy (longer when slowed down).
+            const int channels = int(reader->numChannels);
+            const double peak = double(reader->lengthInSamples) * channels * sizeof(float) * (1 + 1 / ratio);
+            if (peak > maxMemoryBytes)
+            {
+                setMessage("Too long for this speed (memory) / Troppo lungo per questa velocita");
+                loading = false;
+                continue;
+            }
+            juce::AudioBuffer<float> original(channels, int(reader->lengthInSamples));
+            if (!reader->read(&original, 0, original.getNumSamples(), 0, true, channels > 1))
             {
                 setMessage("Audio read failed");
                 loading = false;
@@ -373,5 +420,6 @@ class LowlineStudio : private juce::Thread
     std::atomic<double> requestedPosition{-1};
     double cursor = 0, fileRate = 48000, actualSpeed = 1, beatPhase = 0;
     int beat = -1, clickRemaining = 0;
+    int64_t lastBeat = INT64_MIN;
     float clickHz = 900;
 };

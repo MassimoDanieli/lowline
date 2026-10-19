@@ -82,6 +82,7 @@ LowlineWorkbench::LowlineWorkbench(LowlineProcessor &p)
     });
     button("click", "METRONOMO ON/OFF", "METRONOME ON/OFF",
            [this] { proc.studio.click = !proc.studio.click; });
+    button("beatOne", "BATTITO 1 QUI", "BEAT 1 HERE", [this] { proc.studio.setBeatOneHere(); });
     button("record", "REGISTRA DI + FX", "RECORD DI + FX", [this] { record(); });
     button("endRecord", "FERMA REGISTRAZIONE", "STOP RECORDING", [this] { proc.studio.stopRecording(); });
     button("stagePrev", "< PRESET", "< PRESET", [this] { activate(-1); });
@@ -352,6 +353,7 @@ void LowlineWorkbench::resized()
         meter.setBounds(310, 405, 105, 32);
         labels.at("beatCount")->setVisible(true);
         labels.at("beatCount")->setBounds(430, 405, 210, 32);
+        layoutButton("beatOne", 660, 400, 450, 40);
         layoutButton("record", 22, 468, 300);
         layoutButton("endRecord", 340, 468, 300);
     }
@@ -612,6 +614,7 @@ void LowlineWorkbench::timerCallback()
     buttons.at("recallB")->setEnabled(proc.hasComparison(1) && !proc.busy);
     buttons.at("loop")->setToggleState(proc.studio.looping, dontSendNotification);
     buttons.at("click")->setToggleState(proc.studio.click, dontSendNotification);
+    buttons.at("beatOne")->setToggleState(proc.studio.beatOne.load() >= 0, dontSendNotification);
     buttons.at("play")->setToggleState(proc.studio.playing, dontSendNotification);
     buttons.at("record")->setToggleState(proc.studio.recording, dontSendNotification);
     buttons.at("render")->setEnabled(!proc.studio.loading);
@@ -657,6 +660,7 @@ void LowlineWorkbench::timerCallback()
             "Loop: " + String(proc.studio.loopStart.load(), 1) + " - " +
             String(proc.studio.loopEnd.load(), 1) + " s   /   " + String(proc.studio.speed.load(), 2) +
             "x   /   Beat " + String(proc.studio.beatDisplay.load()) +
+            (proc.studio.beatOne.load() >= 0 ? String(it() ? "  (agganciato alla base, 1 = " : "  (locked to backing, 1 = ") + String(proc.studio.beatOne.load(), 2) + " s)" : String()) +
             "\nREC: " + String(proc.studio.recordedSamples.load() / proc.audioRate(), 1) +
             " s   /   dropped blocks: " + String(proc.studio.dropped.load()) + "\n" +
             (it() ? "DI = basso prima degli effetti; FX = basso elaborato. Base e metronomo non vengono "
