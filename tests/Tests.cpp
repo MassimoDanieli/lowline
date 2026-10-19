@@ -925,6 +925,20 @@ int main(int argc, char **argv)
             lowline::platform::documentsForTests() = File{};
             require(lowline::platform::adopt(URL(outside), "Captures") == outside, "desktop: picked files are used in place");
         }
+        {
+            // AUv3 (and iPad): the guide opens inside the interface, not as a separate window.
+            AudioProcessor::setTypeOfNextNewPlugin(AudioProcessor::wrapperType_AudioUnitv3);
+            LowlineProcessor auv3;
+            AudioProcessor::setTypeOfNextNewPlugin(AudioProcessor::wrapperType_Undefined);
+            std::unique_ptr<AudioProcessorEditor> editor(auv3.createEditor());
+            auto *view = editor->findChildWithID("lowline-view");
+            auto *help = dynamic_cast<TextButton *>(view->findChildWithID("lowline-help"));
+            require(help != nullptr, "AUv3 editor has a help button");
+            help->onClick();
+            LowlineHelpOverlay *overlay = nullptr;
+            for (auto *child : view->getChildren()) if (auto *o = dynamic_cast<LowlineHelpOverlay *>(child)) overlay = o;
+            require(overlay && overlay->isVisible() && overlay->getWidth() == 1180, "AUv3: the guide opens inside the interface");
+        }
         temp.deleteRecursively();
         std::cout << "All audio checks passed.\n";
         return 0;

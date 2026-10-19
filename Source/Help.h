@@ -95,6 +95,31 @@ class LowlineHelpContent : public juce::Component
     juce::StringArray headings, sections;
 };
 
+// iPad and AUv3: the guide opens inside the interface (no separate windows there).
+class LowlineHelpOverlay : public juce::Component
+{
+  public:
+    explicit LowlineHelpOverlay(bool italian) : content(italian)
+    {
+        addAndMakeVisible(content);
+        addAndMakeVisible(close);
+        close.onClick = [this] { setVisible(false); };
+        close.setComponentID("lowline-help-close");
+    }
+    void setLanguage(bool italian) { content.setLanguage(italian); }
+    void paint(juce::Graphics &g) override { g.fillAll(juce::Colour(0xe011151b)); }
+    void resized() override
+    {
+        auto area = getLocalBounds().reduced(40, 30);
+        close.setBounds(area.removeFromTop(40).removeFromRight(120));
+        content.setBounds(area);
+    }
+
+  private:
+    LowlineHelpContent content;
+    juce::TextButton close{"OK"};
+};
+
 class LowlineHelpWindow : public juce::DocumentWindow
 {
   public:

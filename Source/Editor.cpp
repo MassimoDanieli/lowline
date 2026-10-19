@@ -1,4 +1,7 @@
 #include "Editor.h"
+#if JucePlugin_Build_Standalone
+ #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
+#endif
 using namespace juce;
 namespace
 {
@@ -136,6 +139,18 @@ LowlineView::LowlineView(LowlineProcessor &p) : proc(p)
     helpButton.setComponentID("lowline-help");
     helpButton.onClick = [this]
     {
+        if (inlineHelp())
+        {
+            if (!helpOverlay)
+            {
+                helpOverlay = std::make_unique<LowlineHelpOverlay>(proc.getLanguage() == "IT");
+                addChildComponent(*helpOverlay);
+            }
+            helpOverlay->setBounds(getLocalBounds());
+            helpOverlay->setVisible(true);
+            helpOverlay->toFront(true);
+            return;
+        }
         if (!helpWindow)
             helpWindow = std::make_unique<LowlineHelpWindow>(proc.getLanguage() == "IT");
         helpWindow->setVisible(true);
@@ -193,6 +208,33 @@ LowlineView::LowlineView(LowlineProcessor &p) : proc(p)
     subtitle.setColour(Label::textColourId, muted);
     statusLabel.setColour(Label::textColourId, muted);
     meterLabel.setFont(Font(13.f));
+    if (mobileStandalone())
+    {
+        addAndMakeVisible(audioButton);
+        audioButton.setComponentID("ios-audio");
+        audioButton.onClick = []
+        {
+           #if JucePlugin_Build_Standalone
+            if (auto *holder = StandalonePluginHolder::getInstance()) holder->showAudioSettingsDialog();
+           #endif
+        };
+       #if JucePlugin_Build_Standalone
+        if (auto *holder = StandalonePluginHolder::getInstance())
+        {
+            // JUCE mutes the input on every iOS launch (feedback protection). Lowline remembers
+            // that you un-muted it once (e.g. with headphones or an interface) and keeps it open.
+            inputMuted.referTo(holder->getMuteInputValue());
+            if (auto xml = XmlDocument::parse(LowlineProcessor::midiSettingsFile().getSiblingFile("standalone.xml")))
+                if (xml->getBoolAttribute("inputOpen")) inputMuted = false;
+            inputMuted.addListener(this);
+        }
+       #endif
+    }
+    if (mobileStandalone() && BluetoothMidiDevicePairingDialogue::isAvailable())
+    {
+        addChildComponent(bluetoothButton);
+        bluetoothButton.onClick = [] { BluetoothMidiDevicePairingDialogue::open(); };
+    }
     workbench = std::make_unique<LowlineWorkbench>(proc);
     addAndMakeVisible(*workbench);
     addAndMakeVisible(workbenchTab);
@@ -228,6 +270,8 @@ void LowlineView::translate()
     helpButton.setButtonText(it ? "GUIDA" : "HELP");
     if (helpWindow)
         helpWindow->setLanguage(it);
+    if (helpOverlay)
+        helpOverlay->setLanguage(it);
     repaint();
 }
 void LowlineView::panel(Graphics &g, Rectangle<int> r, const String &title, Colour accent)
@@ -311,6 +355,10 @@ void LowlineView::resized()
     rigTab.setBounds(24, 92, 90, 24); toolsTab.setBounds(122, 92, 118, 24); midiTab.setBounds(248, 92, 90, 24);
     source.setBounds(740, 25, 180, 30);
     helpButton.setBounds(628, 25, 96, 30);
+    audioButton.setBounds(520, 25, 96, 30);
+    bluetoothButton.setVisible(page == 2 && mobileStandalone() && BluetoothMidiDevicePairingDialogue::isAvailable());
+    bluetoothButton.setBounds(712, 582, 220, 32);
+    if (helpOverlay) helpOverlay->setBounds(getLocalBounds());
     programs.setBounds(936, 25, 220, 30);
     saveButton.setBounds(652, 70, 80, 28);
     packButton.setBounds(740, 70, 86, 28);
@@ -541,7 +589,8 @@ LowlineEditor::LowlineEditor(LowlineProcessor &p) : AudioProcessorEditor(p), vie
     addAndMakeVisible(view);
     constexpr double ratio = double(LowlineView::designWidth) / LowlineView::designHeight;
     setResizable(true, true);
-    setResizeLimits(LowlineView::designWidth / 2, LowlineView::designHeight / 2, LowlineView::designWidth * 2,
+    // Down to a third: an iPhone in landscape is only ~390 points tall.
+    setResizeLimits(LowlineView::designWidth / 3, LowlineView::designHeight / 3, LowlineView::designWidth * 2,
                     LowlineView::designHeight * 2);
     getConstrainer()->setFixedAspectRatio(ratio);
     int width = 0;
@@ -557,7 +606,7 @@ LowlineEditor::LowlineEditor(LowlineProcessor &p) : AudioProcessorEditor(p), vie
             width = jmin(width, area.getWidth(), int(area.getHeight() * ratio));
         }
     }
-    width = jlimit(LowlineView::designWidth / 2, LowlineView::designWidth * 2, width);
+    width = jlimit(LowlineView::designWidth / 3, LowlineView::designWidth * 2, width);
     setSize(width, int(std::round(width / ratio)));
 }
 LowlineEditor::~LowlineEditor()
@@ -572,4 +621,28 @@ void LowlineEditor::resized()
     view.setBounds(0, 0, LowlineView::designWidth, LowlineView::designHeight);
     view.setTransform(AffineTransform::scale(scale).translated((getWidth() - LowlineView::designWidth * scale) / 2,
                                                               (getHeight() - LowlineView::designHeight * scale) / 2));
+}
+
+bool LowlineView::inlineHelp() const
+{
+   #if JUCE_IOS
+    return true;
+   #else
+    return proc.wrapperType == AudioProcessor::wrapperType_AudioUnitv3;
+   #endif
+}
+bool LowlineView::mobileStandalone() const
+{
+   #if JUCE_IOS
+    return proc.wrapperType == AudioProcessor::wrapperType_Standalone;
+   #else
+    return false;
+   #endif
+}
+void LowlineView::valueChanged(Value &)
+{
+    XmlElement xml("LowlineStandalone");
+    xml.setAttribute("inputOpen", !bool(inputMuted.getValue()));
+    const auto file = LowlineProcessor::midiSettingsFile().getSiblingFile("standalone.xml");
+    if (file.getParentDirectory().createDirectory().wasOk()) xml.writeTo(file);
 }

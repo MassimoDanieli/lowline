@@ -12,6 +12,7 @@ class LowlineLook : public juce::LookAndFeel_V4
 // The whole interface, laid out at its design size (1180 x 830).
 class LowlineView : public juce::Component,
                     private juce::Timer,
+                    private juce::Value::Listener,
                     public juce::FileDragAndDropTarget
 {
   public:
@@ -69,6 +70,13 @@ class LowlineView : public juce::Component,
     juce::Label statusLabel, subtitle, meterLabel;
     std::unique_ptr<juce::FileChooser> chooser;
     std::unique_ptr<LowlineHelpWindow> helpWindow;
+    std::unique_ptr<LowlineHelpOverlay> helpOverlay;
+    // iOS standalone: audio settings, Bluetooth MIDI pairing, remembered input un-mute.
+    juce::TextButton audioButton{"AUDIO"}, bluetoothButton{"BLUETOOTH MIDI"};
+    juce::Value inputMuted;
+    void valueChanged(juce::Value &) override;
+    bool inlineHelp() const;
+    bool mobileStandalone() const;
 };
 // Resizable window: the view is scaled to fit (fixed aspect ratio); the size is remembered.
 class LowlineEditor : public juce::AudioProcessorEditor
