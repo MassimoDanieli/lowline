@@ -14,6 +14,7 @@ struct LowlineCapture
     uint64_t generation = 0;
     bool hasLoudness = false, compatible = true;
     int prewarmSamples = 0;
+    bool monoIr = false; // cab with a mono IR file: one convolution, copied to both channels
     lowline::Slew normalGain;
     void prepare(double sr, int size)
     {
@@ -27,7 +28,7 @@ struct LowlineCapture
             prewarmSamples = std::clamp(model->GetPrewarmSamples(), 0, int(sr * .25));
         }
         if (ir)
-            ir->prepare({sr, (juce::uint32)size, 2});
+            ir->prepare({sr, (juce::uint32)size, monoIr ? 1u : 2u});
     }
     void process(juce::AudioBuffer<float> &input, juce::AudioBuffer<float> &output, int n, bool normalise,
                  float target)
@@ -49,8 +50,18 @@ struct LowlineCapture
             if (ir)
             {
                 auto block = juce::dsp::AudioBlock<float>(output).getSubBlock(0, size_t(n));
-                juce::dsp::ProcessContextReplacing<float> context(block);
-                ir->process(context);
+                if (monoIr)
+                {
+                    auto left = block.getSingleChannelBlock(0);
+                    juce::dsp::ProcessContextReplacing<float> context(left);
+                    ir->process(context);
+                    output.copyFrom(1, 0, output, 0, 0, n);
+                }
+                else
+                {
+                    juce::dsp::ProcessContextReplacing<float> context(block);
+                    ir->process(context);
+                }
             }
         }
     }

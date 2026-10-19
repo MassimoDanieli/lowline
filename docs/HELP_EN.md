@@ -46,7 +46,7 @@ IN and OUT show audio-block peaks in dBFS, not perceived loudness. IN refers to 
 
 LIMIT means the output limiter is reducing level. Lower OUTPUT, MAKEUP or upstream levels if it activates frequently. The limiter links both stereo channels, adds approximately 1 ms of lookahead and targets peaks of ±0.98. It is not a true-peak limiter and does not replace sensible gain settings.
 
-BYPASS skips the rig chain while retaining input selection, INPUT, OUTPUT and final protection. It does not automatically match comparison levels. The host's plugin bypass preserves the declared latency.
+BYPASS skips the rig chain with a ~15 ms crossfade (no click) while retaining input selection, INPUT, OUTPUT and final protection; delay and reverb fade out. It does not automatically match comparison levels. The host's plugin bypass preserves the declared latency.
 
 CPU shows smoothed audio-callback processing time as a percentage of the time available for each block. It is not total system CPU usage: spikes near or above 100% can cause drop-outs. Capture changes temporarily process two engines.
 
@@ -70,7 +70,7 @@ MAKEUP (0…24 dB): restores level after compression. It is not automatic and ca
 Try RATIO 4:1, ATTACK 15 ms and RELEASE 120 ms. Play normally and adjust THRESHOLD until GR shows a few dB on stronger notes. Compare on/off, adjusting MAKEUP so that you do not simply prefer whichever sound is louder.
 
 ## 05 · Booster, NAM models and cabinet
-BOOST ON enables simple saturation before the models. BOOST (0…24 dB) increases drive and distortion; it is not a transparent volume control. Start low, especially with an active bass.
+BOOST ON enables soft saturation (anti-aliased tanh) before the models; switching it does not click. BOOST (0…24 dB) increases drive and distortion; it is not a transparent volume control. Start low, especially with an active bass.
 
 The NAM slots run in series:
 • PEDAL: a pedal capture, before the amp.
@@ -91,7 +91,7 @@ NAM/IR changes use a 50 ms crossfade between the previous engine and the new eng
 TONE3000 opens the website in your browser: download a file yourself, then load it into the correct slot. There is no integrated downloader. No models or IRs are included.
 
 ## 06 · EQ and parallel clean signal
-EQ lives in TOOLS. Five bell filters provide −12 to +12 dB gain: BASS (100 Hz), LOW MID (default 250 Hz), MID (default 700 Hz), HIGH MID (default 1500 Hz) and TREBLE (3500 Hz).
+EQ lives in TOOLS. Five bands provide −12 to +12 dB gain: BASS is a shelf below 100 Hz (half the gain at 100 Hz, the full gain further down), LOW MID (default 250 Hz), MID (default 700 Hz) and HIGH MID (default 1500 Hz) are bells, TREBLE is a shelf above 3500 Hz. Gains and frequencies glide without steps, even when turned while playing.
 
 LOW MID FREQ ranges from 80 to 800 Hz; MID FREQ from 150 to 2500 Hz; HIGH MID FREQ from 500 to 6000 Hz. Bands can overlap: make small changes and compare loudness. The two additional bands default to 0 dB, retaining older presets' original settings. EQ affects only the processed branch, before the cabinet IR.
 

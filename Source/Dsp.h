@@ -105,6 +105,48 @@ struct Biquad
         a1 = -2 * co / d;
         a2 = (1 - al / a) / d;
     }
+    // RBJ shelves, slope 1: half the gain (in dB) at f, the full gain well beyond it.
+    void lowShelf(double sr, float f, float gain)
+    {
+        f = std::clamp(f, 10.f, float(sr) * .45f);
+        const float a = std::pow(10.f, gain / 40), w = 2 * pi * f / float(sr), co = std::cos(w),
+                    al = std::sin(w) / 2 * std::sqrt(2.f), s = 2 * std::sqrt(a) * al, d = (a + 1) + (a - 1) * co + s;
+        b0 = a * ((a + 1) - (a - 1) * co + s) / d;
+        b1 = 2 * a * ((a - 1) - (a + 1) * co) / d;
+        b2 = a * ((a + 1) - (a - 1) * co - s) / d;
+        a1 = -2 * ((a - 1) + (a + 1) * co) / d;
+        a2 = ((a + 1) + (a - 1) * co - s) / d;
+    }
+    void highShelf(double sr, float f, float gain)
+    {
+        f = std::clamp(f, 10.f, float(sr) * .45f);
+        const float a = std::pow(10.f, gain / 40), w = 2 * pi * f / float(sr), co = std::cos(w),
+                    al = std::sin(w) / 2 * std::sqrt(2.f), s = 2 * std::sqrt(a) * al, d = (a + 1) - (a - 1) * co + s;
+        b0 = a * ((a + 1) + (a - 1) * co + s) / d;
+        b1 = -2 * a * ((a - 1) + (a + 1) * co) / d;
+        b2 = a * ((a + 1) + (a - 1) * co - s) / d;
+        a1 = 2 * ((a - 1) - (a + 1) * co) / d;
+        a2 = ((a + 1) - (a - 1) * co - s) / d;
+    }
+};
+// tanh saturation with first-order antiderivative anti-aliasing (ADAA): far less aliasing
+// than a plain tanh at high boost, no oversampling filters and only half a sample of delay.
+struct AdaaTanh
+{
+    double x1 = 0, f1 = 0;
+    void reset() { x1 = f1 = 0; }
+    static double logCosh(double x)
+    {
+        const double a = std::abs(x);
+        return a + std::log1p(std::exp(-2 * a)) - 0.6931471805599453;
+    }
+    float tick(float input)
+    {
+        const double x = input, f = logCosh(x), d = x - x1;
+        const double y = std::abs(d) < 1.e-5 ? std::tanh(.5 * (x + x1)) : (f - f1) / d;
+        x1 = x; f1 = f;
+        return float(y);
+    }
 };
 struct Delay
 {

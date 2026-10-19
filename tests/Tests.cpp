@@ -39,6 +39,23 @@ float toneRms(LowlineProcessor &processor, float hz)
     }
     return audio.getRMSLevel(0, 0, 256);
 }
+// RMS over the last 30 blocks (7680 samples = whole periods of 25 Hz): phase-independent.
+float toneRmsLong(LowlineProcessor &processor, float hz)
+{
+    AudioBuffer<float> audio(2, 256);
+    MidiBuffer midi;
+    double energy = 0;
+    for (int block = 0; block < 150; ++block)
+    {
+        for (int i = 0; i < 256; ++i)
+            for (int ch = 0; ch < 2; ++ch)
+                audio.setSample(ch, i, .05f * std::sin(2 * lowline::pi * hz * (block * 256 + i) / 48000));
+        processor.processBlock(audio, midi);
+        if (block >= 120)
+            for (int i = 0; i < 256; ++i) energy += audio.getSample(0, i) * audio.getSample(0, i);
+    }
+    return float(std::sqrt(energy / (30 * 256)));
+}
 class TempoPlayHead : public AudioPlayHead
 {
   public:
@@ -272,13 +289,24 @@ int main(int argc, char **argv)
         LowlineProcessor shaping;
         shaping.prepareToPlay(48000, 256);
         set(shaping, "compOn", 0); set(shaping, "blend", 100); set(shaping, "output", 0);
-        for (auto entry : {std::pair<const char *, float>{"bass", 100}, {"lowMid", 250}, {"mid", 700}, {"highMid", 1500}, {"treble", 3500}})
+        for (auto entry : {std::pair<const char *, float>{"lowMid", 250}, {"mid", 700}, {"highMid", 1500}})
         {
             const float dryLevel = toneRms(shaping, entry.second);
             set(shaping, entry.first, 6);
             const float boosted = toneRms(shaping, entry.second);
             require(std::abs(boosted / dryLevel - lowline::db(6)) < .03f, "five-band EQ applies the selected band's gain");
             set(shaping, entry.first, 0);
+        }
+        // BASS and TREBLE are shelves: half the gain at the corner, the full gain beyond it.
+        for (auto entry : {std::tuple<const char *, float, float>{"bass", 100, 25}, {"treble", 3500, 14000}})
+        {
+            const auto [id, corner, far] = entry;
+            const float dryCorner = toneRmsLong(shaping, corner), dryFar = toneRmsLong(shaping, far);
+            set(shaping, id, 6);
+            const float atCorner = lowline::toDb(toneRmsLong(shaping, corner) / dryCorner),
+                        beyond = lowline::toDb(toneRmsLong(shaping, far) / dryFar);
+            require(std::abs(atCorner - 3) < .4f && std::abs(beyond - 6) < .5f, "BASS / TREBLE shelve with full gain beyond the corner");
+            set(shaping, id, 0);
         }
         TempoPlayHead hostTempo;
         shaping.setPlayHead(&hostTempo);
@@ -722,6 +750,51 @@ int main(int argc, char **argv)
             set(r, "ampOn", 1);
             settle(r, a, .1f);
             require(std::abs(a.getSample(0, 255) - .05f) < .002f, "a capture switched back on after idling plays normally");
+        }
+        {
+            // 0.3.2 sound: bypass crossfade, anti-aliased boost.
+            LowlineProcessor s;
+            s.prepareToPlay(48000, 256);
+            for (auto *id : {"compOn", "pedalOn", "ampOn", "cabOn", "delayOn", "reverbOn"}) set(s, id, 0);
+            set(s, "blend", 100); set(s, "output", -6); set(s, "driveOn", 1); set(s, "drive", 18);
+            AudioBuffer<float> a(2, 256);
+            MidiBuffer none3;
+            int t = 0;
+            float last = 0;
+            auto run = [&](int blocks)
+            {
+                float jump = 0;
+                for (int k = 0; k < blocks; ++k)
+                {
+                    for (int i = 0; i < 256; ++i, ++t)
+                        for (int ch = 0; ch < 2; ++ch) a.setSample(ch, i, .3f * std::sin(2 * lowline::pi * 110 * t / 48000));
+                    s.processBlock(a, none3);
+                    for (int i = 0; i < 256; ++i) { jump = std::max(jump, std::abs(a.getSample(0, i) - last)); last = a.getSample(0, i); }
+                }
+                return jump;
+            };
+            run(40);
+            const float steady = run(20);
+            set(s, "bypass", 1);
+            const float switching = run(20);
+            set(s, "bypass", 0);
+            const float back = run(20);
+            require(switching < steady * 1.3f && back < steady * 1.3f, "internal bypass crossfades without a click");
+
+            auto aliasAt3k = [](bool adaa)
+            {
+                lowline::AdaaTanh sat;
+                double re = 0, im = 0;
+                for (int i = 0; i < 48000; ++i)
+                {
+                    const float x = 10.f * std::sin(2 * lowline::pi * 5000.f * float(i) / 48000.f);
+                    const float y = adaa ? sat.tick(x) : std::tanh(x);
+                    re += y * std::cos(2 * lowline::pi * 3000.0 * i / 48000); im += y * std::sin(2 * lowline::pi * 3000.0 * i / 48000);
+                }
+                return std::sqrt(re * re + im * im) / 24000;
+            };
+            const double plain = aliasAt3k(false), smooth = aliasAt3k(true);
+            require(lowline::toDb(float(smooth)) < lowline::toDb(float(plain)) - 10, "BOOST aliasing (9th harmonic folded to 3 kHz) drops by more than 10 dB");
         }
         temp.deleteRecursively();
         std::cout << "All audio checks passed.\n";

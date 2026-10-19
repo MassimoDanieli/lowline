@@ -113,7 +113,11 @@ class LowlineProcessor : public juce::AudioProcessor, public juce::AsyncUpdater
     lowline::PeakLimiter limiter;
     std::atomic<double> rate{48000};
     std::atomic<int> maxBlock{512};
-    juce::AudioBuffer<float> work, dry;
+    juce::AudioBuffer<float> work, dry, raw;
+    lowline::Slew bypassMix, driveMix;
+    lowline::AdaaTanh saturator;
+    std::array<float, 5> eqGainNow{}, eqFreqNow{};
+    void updateEq(bool snap);
     std::array<LowlineCaptureSlot, 4> captures;
     juce::SpinLock modelLock;
     juce::SpinLock publicationLock;

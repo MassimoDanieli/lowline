@@ -46,7 +46,7 @@ IN e OUT mostrano i picchi dei blocchi audio in dBFS, non una misura di volume p
 
 LIMIT indica che il limiter sta riducendo il livello. Abbassa OUTPUT, MAKEUP o il livello a monte se interviene spesso. Il limiter è stereo-linked, aggiunge circa 1 ms di lookahead e mira a picchi di ±0,98. Non è un true-peak limiter e non sostituisce una buona regolazione dei livelli.
 
-BYPASS salta la catena del rig, conservando selezione dell'ingresso, INPUT, OUTPUT e protezione finale. Non è un confronto a volume automaticamente pareggiato. Il bypass del plugin nel programma ospite conserva la latenza dichiarata.
+BYPASS salta la catena del rig con una dissolvenza di circa 15 ms (niente clic), conservando selezione dell'ingresso, INPUT, OUTPUT e protezione finale; delay e riverbero sfumano. Non è un confronto a volume automaticamente pareggiato. Il bypass del plugin nel programma ospite conserva la latenza dichiarata.
 
 CPU mostra il tempo impiegato dal callback audio come percentuale del tempo disponibile per ogni blocco, con una media smussata. Non è l'utilizzo totale del processore: un picco vicino o oltre 100% può causare interruzioni. Durante un cambio cattura vengono elaborati temporaneamente due motori.
 
@@ -70,7 +70,7 @@ MAKEUP (0…24 dB): recupera volume dopo la compressione. Non è automatico e pu
 Prova RATIO 4:1, ATTACK 15 ms e RELEASE 120 ms. Suona normalmente e regola THRESHOLD finché GR indica qualche dB sulle note più forti. Confronta acceso/spento, correggendo MAKEUP per evitare di preferire soltanto il suono più forte.
 
 ## 05 · Booster, modelli NAM e cassa
-BOOST ON attiva una saturazione semplice prima dei modelli. BOOST (0…24 dB) aumenta la spinta e la distorsione; non è un controllo trasparente di volume. Parti con poco drive, soprattutto con bassi attivi.
+BOOST ON attiva una saturazione morbida (tanh con anti-aliasing) prima dei modelli; accenderla e spegnerla non fa clic. BOOST (0…24 dB) aumenta la spinta e la distorsione; non è un controllo trasparente di volume. Parti con poco drive, soprattutto con bassi attivi.
 
 I due slot NAM sono in serie:
 • PEDAL: una cattura di pedale, prima dell'amplificatore.
@@ -91,7 +91,7 @@ Il cambio NAM/IR usa una dissolvenza di 50 ms fra il motore precedente e quello 
 TONE3000 apre il sito nel browser: scarica tu il file e poi caricalo nello slot corretto. Non c'è un downloader integrato. Modelli e IR non sono inclusi.
 
 ## 06 · EQ e suono pulito parallelo
-L'EQ è nella scheda STRUMENTI. Cinque filtri a campana regolano il guadagno da −12 a +12 dB: BASS (100 Hz), LOW MID (default 250 Hz), MID (default 700 Hz), HIGH MID (default 1500 Hz) e TREBLE (3500 Hz).
+L'EQ è nella scheda STRUMENTI. Cinque bande regolano il guadagno da −12 a +12 dB: BASS è uno shelf sotto 100 Hz (a 100 Hz metà del guadagno, più in basso tutto), LOW MID (default 250 Hz), MID (default 700 Hz) e HIGH MID (default 1500 Hz) sono filtri a campana, TREBLE è uno shelf sopra 3500 Hz. Guadagni e frequenze scorrono senza scalini anche girando le manopole mentre suoni.
 
 LOW MID FREQ varia da 80 a 800 Hz; MID FREQ da 150 a 2500 Hz; HIGH MID FREQ da 500 a 6000 Hz. Le bande possono sovrapporsi: usa piccoli cambiamenti e confronta il volume. Le due bande aggiuntive partono da 0 dB, e i vecchi preset conservano le regolazioni originali. L'EQ agisce soltanto sul ramo elaborato, prima della cassa IR.
 

@@ -101,6 +101,10 @@ void LowlineProcessor::prepareToPlay(double sr, int n)
     maxBlock = std::max(1, n);
     work.setSize(2, maxBlock);
     dry.setSize(2, maxBlock);
+    raw.setSize(1, maxBlock);
+    bypassMix.prepare(sr, p("bypass") > .5f ? 1.f : 0.f);
+    driveMix.prepare(sr, p("driveOn") > .5f ? 1.f : 0.f);
+    saturator.reset();
     limiter.prepare(sr);
     studio.prepare(sr, maxBlock);
     compareGain.prepare(sr, 1);
@@ -109,6 +113,7 @@ void LowlineProcessor::prepareToPlay(double sr, int n)
     dryDelay.prepare(sr);
     for (auto &e : eq)
         e.reset();
+    updateEq(true);
     inputGain.prepare(sr, lowline::db(p("input")));
     outputGain.prepare(sr, lowline::db(p("output")));
     blend.prepare(sr, p("blend") * .01f);
@@ -321,10 +326,28 @@ void LowlineProcessor::limitOutput(AudioBuffer<float> &buffer, bool allowMute)
     if (getTotalNumOutputChannels() > 1)
         outputPeak = std::max(outputPeak.load(), buffer.getMagnitude(1, 0, buffer.getNumSamples()));
 }
+void LowlineProcessor::updateEq(bool snap)
+{
+    // Band gains and frequencies glide (about 20 ms) instead of stepping once per block.
+    const float target[5][2] = {{p("bass"), 100}, {p("lowMid"), p("lowMidFreq")}, {p("mid"), p("midFreq")},
+                                {p("highMid"), p("highMidFreq")}, {p("treble"), 3500}};
+    const float k = snap ? 1.f : .2f; // called every 32 samples
+    for (size_t b = 0; b < 5; ++b)
+    {
+        eqGainNow[b] += k * (target[b][0] - eqGainNow[b]);
+        eqFreqNow[b] = eqFreqNow[b] <= 0 || snap ? target[b][1] : eqFreqNow[b] * std::pow(target[b][1] / eqFreqNow[b], k);
+    }
+    eq[0].lowShelf(rate, eqFreqNow[0], eqGainNow[0]);
+    for (size_t b = 1; b < 4; ++b) eq[b].peak(rate, eqFreqNow[b], eqGainNow[b]);
+    eq[4].highShelf(rate, eqFreqNow[4], eqGainNow[4]);
+}
 void LowlineProcessor::processChunk(AudioBuffer<float> &out, int off, int n)
 {
     const float inTarget = lowline::db(p("input")), outTarget = lowline::db(p("output"));
     const bool bypass = p("bypass") > .5f;
+    // The rig keeps running while the bypass crossfade (15 ms) is in progress; only a fully
+    // bypassed rig skips the processing. Delay and reverb tails still fade out on bypass.
+    const bool process = !bypass || bypassMix.value < .9999f;
     {
         const SpinLock::ScopedTryLockType publish(publicationLock);
         if (publish.isLocked()) for (auto &capture : captures) capture.beginChunk();
@@ -339,32 +362,36 @@ void LowlineProcessor::processChunk(AudioBuffer<float> &out, int off, int n)
             x = 0;
         if (p("tunerOn")) tuner.push(x);
         x *= inputGain.next(inTarget);
-        x = gate.tick(x, p("gateOn") && !bypass, p("gateThreshold"), p("gateRelease"));
-        if (p("compOn") > .5f && !bypass)
+        raw.setSample(0, i, x);
+        x = gate.tick(x, p("gateOn") && process, p("gateThreshold"), p("gateRelease"));
+        if (p("compOn") > .5f && process)
             x = compressor.tick(x, p("threshold"), p("ratio"), p("attack"), p("release"), p("makeup"));
         dry.setSample(0, i, x);
         work.setSample(0, i, x);
     }
     gainReduction = p("compOn") > .5f && !bypass ? compressor.reduction : 0;
-    if (!bypass)
+    if (process)
     {
-        if (p("driveOn") > .5f)
+        const float driveTarget = p("driveOn") > .5f ? 1.f : 0.f;
+        if (driveTarget > 0 || driveMix.value > 1.e-4f)
             for (int i = 0; i < n; ++i)
             {
-                float g = drive.next(lowline::db(p("drive")));
-                work.setSample(0, i, std::tanh(work.getSample(0, i) * g));
+                const float g = drive.next(lowline::db(p("drive")));
+                const float m = driveMix.next(driveTarget), x = work.getSample(0, i);
+                work.setSample(0, i, x + m * (saturator.tick(x * g) - x));
             }
+        else
+        {
+            driveMix.value = 0;
+            saturator.reset();
+        }
         work.copyFrom(1, 0, work, 0, 0, n);
         for (int stage = 0; stage < 2; ++stage)
             captures[size_t(stage)].process(work, n, p(stage == 0 ? "pedalOn" : "ampOn") > .5f,
                                            p("normOn") > .5f, p("normTarget"), false);
-        eq[0].peak(rate, 100, p("bass"));
-        eq[1].peak(rate, p("lowMidFreq"), p("lowMid"));
-        eq[2].peak(rate, p("midFreq"), p("mid"));
-        eq[3].peak(rate, p("highMidFreq"), p("highMid"));
-        eq[4].peak(rate, 3500, p("treble"));
         for (int i = 0; i < n; ++i)
         {
+            if ((i & 31) == 0) updateEq(false);
             float x = work.getSample(0, i);
             if (!std::isfinite(x))
                 x = 0;
@@ -374,7 +401,7 @@ void LowlineProcessor::processChunk(AudioBuffer<float> &out, int off, int n)
         }
     }
     work.copyFrom(1, 0, work, 0, 0, n);
-    captures[Cab].process(work, n, !bypass && p("cabOn") > .5f, false, 0, false);
+    if (process) captures[Cab].process(work, n, p("cabOn") > .5f, false, 0, false);
     const float polarity = p("invert") > .5f ? -1.f : 1.f;
     for (int i = 0; i < n; ++i)
     {
@@ -384,8 +411,12 @@ void LowlineProcessor::processChunk(AudioBuffer<float> &out, int off, int n)
         const float clean = (1 - amount) * original + amount * low;
         float d = dryDelay.tick(clean, p("align") * .001f * float(rate.load())) * polarity;
         float wet = blend.next(p("blend") * .01f);
+        const float b = bypassMix.next(bypass ? 1.f : 0.f);
         for (int ch = 0; ch < 2; ++ch)
-            work.setSample(ch, i, bypass ? dry.getSample(0, i) : (1 - wet) * d + wet * work.getSample(ch, i));
+        {
+            const float rig = process ? (1 - wet) * d + wet * work.getSample(ch, i) : 0.f;
+            work.setSample(ch, i, b * raw.getSample(0, i) + (1 - b) * rig);
+        }
     }
     for (int i = 0; i < n; ++i)
     {
@@ -552,8 +583,10 @@ std::unique_ptr<LowlineCapture> LowlineProcessor::prepareCapture(Slot slot, cons
             if (double(reader->lengthInSamples) / reader->sampleRate > (slot == Cab ? 2.0 : 20.0))
                 throw std::runtime_error("IR too long (cab 2 s / room 20 s maximum).");
             capture->tailSeconds = slot == Room ? double(reader->lengthInSamples) / reader->sampleRate : 0;
+            // The cab input is mono: a mono IR needs one convolution, not two identical ones.
+            capture->monoIr = slot == Cab && reader->numChannels == 1;
             capture->ir = std::make_unique<dsp::Convolution>();
-            capture->ir->loadImpulseResponse(file, dsp::Convolution::Stereo::yes, dsp::Convolution::Trim::no, 0,
+            capture->ir->loadImpulseResponse(file, capture->monoIr ? dsp::Convolution::Stereo::no : dsp::Convolution::Stereo::yes, dsp::Convolution::Trim::no, 0,
                                              dsp::Convolution::Normalise::yes);
         }
     }
