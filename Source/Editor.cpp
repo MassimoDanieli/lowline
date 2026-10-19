@@ -64,6 +64,7 @@ LowlineEditor::LowlineEditor(LowlineProcessor &p) : AudioProcessorEditor(p), pro
     {
         auto k = std::make_unique<Knob>();
         k->slider.setSliderStyle(Slider::RotaryHorizontalVerticalDrag);
+        k->slider.onDragStart = [this,id] { proc.undo.beginNewTransaction(id); };
         k->slider.setTextBoxStyle(Slider::TextBoxBelow, false, 88, 20);
         k->slider.setTextValueSuffix(suffix);
         k->slider.setDoubleClickReturnValue(true, proc.state.getParameter(id)->convertFrom0to1(
@@ -189,6 +190,11 @@ LowlineEditor::LowlineEditor(LowlineProcessor &p) : AudioProcessorEditor(p), pro
     subtitle.setColour(Label::textColourId, muted);
     statusLabel.setColour(Label::textColourId, muted);
     meterLabel.setFont(Font(13.f));
+    workbench = std::make_unique<LowlineWorkbench>(proc);
+    addAndMakeVisible(*workbench);
+    addAndMakeVisible(workbenchTab);
+    workbenchTab.setComponentID("tab-workspace");
+    workbenchTab.onClick = [this] { page = 3; resized(); repaint(); workbench->grabKeyboardFocus(); };
     setSize(1180, 830);
     resized();
     translate();
@@ -212,6 +218,7 @@ void LowlineEditor::translate()
     languageButton.setButtonText(proc.getLanguage() + " / " + (it ? "EN" : "IT"));
     packButton.setButtonText(it ? "ESPORTA" : "EXPORT");
     toolsTab.setButtonText(it ? "STRUMENTI" : "TOOLS");
+    workbenchTab.setButtonText(it ? "AREA STUDIO" : "WORKSPACE");
     midiHint.setText(it ? "Scegli un controllo, premi LEARN e muovi il pedale. TAP usa il fronte di salita del CC."
                         : "Choose a control, press LEARN and move the pedal. TAP uses the rising edge of the CC.", dontSendNotification);
     assignButton.setButtonText(it ? "ASSEGNA PRESET" : "ASSIGN PRESET");
@@ -238,7 +245,7 @@ void LowlineEditor::paint(Graphics &g)
     g.drawText("lowline", 24, 10, 220, 54, Justification::centredLeft);
     g.setColour(gold);
     g.setFont(Font(11.f));
-    g.drawText("0.2.0  /  DEVELOPMENT BUILD", 250, 31, 240, 20, Justification::centredLeft);
+    g.drawText("0.3.0  /  BASS WORKSPACE", 250, 31, 240, 20, Justification::centredLeft);
     if (page == 0)
     {
     panel(g, {24, 122, 550, 210}, "01  /  DYNAMICS", mint);
@@ -256,7 +263,7 @@ void LowlineEditor::paint(Graphics &g)
         panel(g, {24, 570, 732, 189}, "05  /  DELAY TEMPO + FILTER", gold);
         panel(g, {772, 570, 384, 189}, "06  /  NAM LEVEL", mint);
     }
-    else
+    else if (page == 2)
     {
         panel(g, {24, 122, 1132, 390}, "01  /  MIDI LEARN", mint);
         panel(g, {24, 528, 1132, 231}, "02  /  PROGRAM CHANGE PRESETS", gold);
@@ -282,6 +289,9 @@ void LowlineEditor::placeToggle(const char *id, Rectangle<int> r)
 }
 void LowlineEditor::resized()
 {
+    if (workbench) { workbench->setVisible(page == 3); workbench->setBounds(24,122,1132,637); }
+    workbenchTab.setBounds(346,92,148,24);
+    workbenchTab.setToggleState(page == 3, dontSendNotification);
     for (auto &[id, k] : knobs) { k->slider.setVisible(false); k->label.setVisible(false); }
     for (auto &[id, t] : toggles) t->button.setVisible(false);
     for (auto &button : loadButtons) button.setVisible(page == 0);
@@ -306,6 +316,7 @@ void LowlineEditor::resized()
     languageButton.setBounds(1064, 70, 92, 28);
     meterLabel.setBounds(24, 785, 1132, 20);
     statusLabel.setBounds(24, 807, 1132, 20);
+    if (page == 3) return;
     if (page == 1)
     {
         const char *eq[] = {"bass", "lowMid", "mid", "highMid", "treble", "lowMidFreq", "midFreq", "highMidFreq"};
@@ -380,6 +391,8 @@ void LowlineEditor::timerCallback()
     const bool synced = proc.state.getRawParameterValue("sync")->load() > .5f;
     knobs.at("time")->slider.setEnabled(!synced);
     knobs.at("time")->label.setText(synced ? "TIME (SYNC)" : "TIME", dontSendNotification);
+    if (++statusTicks % 10 == 0)
+        saveButton.setButtonText(String(proc.getLanguage() == "IT" ? "SALVA" : "SAVE") + (proc.isDirty() ? " *" : ""));
     bool clip = proc.clipped.exchange(false);
     meterLabel.setColour(Label::textColourId, clip ? Colour(0xffff785d) : mint);
     meterLabel.setText("IN " + String(lowline::toDb(proc.inputPeak), 1) + " dB  /  OUT " +

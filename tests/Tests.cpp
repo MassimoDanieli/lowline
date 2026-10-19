@@ -1,5 +1,6 @@
 #include "../Source/Processor.h"
 #include "../Source/Help.h"
+#include "../Source/Workbench.h"
 #include <iostream>
 #include <stdexcept>
 using namespace juce;
@@ -496,24 +497,114 @@ int main(int argc, char **argv)
         }
         require(std::abs(mixedLayout.getSample(0, 255) - .0125f) < .001f,
                 "mono fold uses output bus rather than input buffer width");
+        {
+            LowlineCaptureSlot roomSlot;roomSlot.prepare(48000,256);
+            auto oldRoom=std::make_unique<LowlineCapture>();oldRoom->ir=std::make_unique<dsp::Convolution>();oldRoom->tailSeconds=.5;
+            AudioBuffer<float> echo(2,24000);echo.clear();echo.setSample(0,12000,.5f);echo.setSample(1,12000,.5f);
+            oldRoom->ir->loadImpulseResponse(std::move(echo),48000,dsp::Convolution::Stereo::yes,dsp::Convolution::Trim::no,dsp::Convolution::Normalise::no);
+            oldRoom->prepare(48000,256);roomSlot.publish(std::move(oldRoom));
+            AudioBuffer<float> signal(2,256);for(int j=0;j<50;++j){signal.clear();roomSlot.process(signal,256,true,false,0);}
+            signal.clear();signal.setSample(0,0,.2f);signal.setSample(1,0,.2f);roomSlot.process(signal,256,true,false,0);
+            for(int j=0;j<10;++j){signal.clear();roomSlot.process(signal,256,true,false,0);}
+            auto replacement=std::make_unique<LowlineCapture>();replacement->prepare(48000,256);roomSlot.publish(std::move(replacement));
+            float tailPeak=0;for(int j=0;j<65;++j){signal.clear();roomSlot.process(signal,256,true,false,0);tailPeak=std::max(tailPeak,signal.getMagnitude(0,256));}
+            require(tailPeak>.08f,"outgoing room IR retains delayed energy beyond the 50ms transition");
+        }
+        // 0.3: offline pitch preservation, playback/loop, recorder, A/B and editor workflows.
+        AudioBuffer<float> referenceTone(2,48000);
+        for (int i=0;i<48000;++i) for(int ch=0;ch<2;++ch)
+            referenceTone.setSample(ch,i,.2f*std::sin(2*lowline::pi*220*i/48000));
+        for(double speed : {.5, .75, 1.25, 1.5})
+        {
+            auto stretched=LowlineStudio::stretch(referenceTone,speed,48000);
+            require(std::abs(stretched.getNumSamples()-int(48000/speed))<=1,"stretch length follows speed");
+            int crossings=0;const int start=4000,end=stretched.getNumSamples()-4000;
+            for(int i=start+1;i<end;++i)
+                if(stretched.getSample(0,i-1)<=0&&stretched.getSample(0,i)>0)++crossings;
+            const double frequency=double(crossings)*48000/(end-start);
+            require(std::abs(frequency-220)<3,"offline stretch retains tone pitch at slow and fast speeds");
+            require(stretched.getMagnitude(0,stretched.getNumSamples())<.201f,"stretch remains bounded");
+        }
+        const auto backingFile=temp.getChildFile("backing.wav");
+        {
+            WavAudioFormat wav;std::unique_ptr<AudioFormatWriter> writer(wav.createWriterFor(new FileOutputStream(backingFile),48000,2,32,{},0));
+            require(writer&&writer->writeFromAudioSampleBuffer(referenceTone,0,48000),"write backing fixture");
+        }
+        {
+            LowlineStudio studio;studio.prepare(48000,256);studio.load(backingFile,1);
+            for(int i=0;i<500&&studio.loading;++i)Thread::sleep(10);
+            require(!studio.loading&&std::abs(studio.duration-1)<.001,"worker decodes backing duration");
+            AudioBuffer<float> block(2,256);block.clear();studio.playing=true;studio.mix(block,0,256,2);
+            require(block.getMagnitude(0,256)>.05f&&studio.position>0,"backing playback mixes and advances");
+            studio.loopStart=.1;studio.loopEnd=.2;studio.looping=true;studio.seek(.19);
+            for(int i=0;i<50;++i){block.clear();studio.mix(block,0,256,2);}
+            require(studio.position>=.1&&studio.position<.201,"backing loop wraps inside requested range");
+            studio.playing=false;studio.click=true;studio.accent=2;studio.bpm=120;
+            double clickEnergy=0;for(int i=0;i<100;++i){block.clear();studio.mix(block,0,256,2);clickEnergy+=block.getRMSLevel(0,0,256);}
+            require(clickEnergy>.01&&studio.beatDisplay==2,"metronome produces beats with 2/4 accent mode");
+            studio.click=false;auto take=temp.getChildFile("take.wav");
+            require(studio.startRecording(take),"dual recording starts");
+            for(int i=0;i<12;++i)
+            {
+                for(int ch=0;ch<2;++ch)FloatVectorOperations::fill(block.getWritePointer(ch),.2f,256);
+                studio.captureInput(block,0,256,0,2);block.applyGain(.5f);studio.record(block,0,256,2);
+            }
+            studio.stopRecording();
+            AudioFormatManager fm;fm.registerBasicFormats();
+            std::unique_ptr<AudioFormatReader> di(fm.createReaderFor(temp.getChildFile("take-DI.wav")));
+            std::unique_ptr<AudioFormatReader> fx(fm.createReaderFor(temp.getChildFile("take-FX.wav")));
+            require(di&&fx&&di->lengthInSamples==3072&&fx->lengthInSamples==3072,"recording closes two complete aligned WAV files");
+            require(di->numChannels==1&&fx->numChannels==2&&di->usesFloatingPointData&&fx->usesFloatingPointData,"recording uses mono DI and stereo 32-bit float FX");
+            AudioBuffer<float> read(2,256);di->read(&read,0,256,0,true,false);require(std::abs(read.getSample(0,128)-.2f)<1e-5,"DI preserves input before effects");
+            fx->read(&read,0,256,0,true,true);require(std::abs(read.getSample(0,128)-.1f)<1e-5,"FX captures processed bass independently");
+            require(!studio.startRecording(take),"recorder refuses to overwrite an existing take");
+        }
+        {
+            LowlineProcessor comparison;comparison.prepareToPlay(48000,256);AudioBuffer<float> block(2,256);MidiBuffer messages;
+            set(comparison,"compOn",0);set(comparison,"blend",0);set(comparison,"output",0);
+            comparison.setPresetDetails("Walking bass","jazz,clean","A clean practice sound");comparison.markClean();
+            require(!comparison.isDirty(),"saved fingerprint initially clean");
+            comparison.measuredRms=-20;comparison.storeComparison(0);set(comparison,"bass",6);comparison.measuredRms=-14;comparison.storeComparison(1);
+            require(comparison.isDirty(),"parameter edit marks preset dirty");
+            require(comparison.recallComparison(0),"A comparison can be recalled");wait(comparison);
+            require(std::abs(comparison.state.getRawParameterValue("bass")->load())<.001,"A recall restores controls");
+            comparison.measuredRms=-14;comparison.matchComparison(0);require(std::abs(comparison.compareTrim+6)<.01,"RMS match computes bounded reference gain");
+            comparison.measuredRms=-100;comparison.compareTrim=0;comparison.matchComparison(0);require(comparison.compareTrim==0,"silence cannot cause positive auto gain");
+            comparison.measureLevel();for(int j=0;j<940;++j){for(int ch=0;ch<2;++ch)FloatVectorOperations::fill(block.getWritePointer(ch),.1f,256);comparison.processBlock(block,messages);}
+            require(comparison.measureRemaining==0&&std::abs(comparison.measuredRms+20)<.2,"five-second meter measures actual processed RMS");
+            comparison.undo.clearUndoHistory();comparison.undo.beginNewTransaction("Bass");set(comparison,"bass",4);comparison.state.copyState();
+            require(comparison.undo.canUndo(),"parameter changes enter undo history");comparison.undo.undo();
+            require(std::abs(comparison.state.getRawParameterValue("bass")->load())<.01,"undo restores parameter");
+            auto saved=temp.getChildFile("named.lowline");comparison.savePreset(saved);comparison.setPresetDetails("Other","","");comparison.openPreset(saved);wait(comparison);
+            require(comparison.presetName()=="Walking bass"&&comparison.presetTags().contains("jazz"),"preset name tags and description persist");
+        }
         LowlineProcessor preview;
         preview.prepareToPlay(48000, 256);
         std::unique_ptr<AudioProcessorEditor> e(preview.createEditor());
         require(e->getWidth() == 1180 && e->getHeight() == 830, "native editor opens with all controls");
+        LowlineWorkbench *practiceView = nullptr;
+        for (auto *child : e->getChildren()) if (auto *view = dynamic_cast<LowlineWorkbench *>(child)) practiceView = view;
+        require(practiceView != nullptr,"practice workspace constructed");
+        auto *accentChoice = dynamic_cast<ComboBox *>(practiceView->findChildWithID("practice-accents"));
+        require(accentChoice && accentChoice->getSelectedId()==2 && accentChoice->getText().isNotEmpty(),"translated metronome retains selected accent");
+        preview.setLanguage("EN");practiceView->showPage(2);
+        require(accentChoice->getSelectedId()==2 && accentChoice->getText().contains("1"),"language change preserves metronome selection");
+        preview.setLanguage("IT");practiceView->showPage(0);
+
         auto *helpButton = dynamic_cast<TextButton *>(e->findChildWithID("lowline-help"));
         require(helpButton != nullptr && bool(helpButton->onClick), "editor exposes its help action");
         LowlineHelpContent help(true);
-        require(help.getTopicCount() == 12 && help.getDisplayedText().containsChar(0x00e8),
-                "Italian offline guide contains twelve topics and decoded UTF-8 text");
-        for (int topic = 0; topic < 12; ++topic)
+        require(help.getTopicCount() == 18 && help.getDisplayedText().containsChar(0x00e8),
+                "Italian offline guide contains eighteen topics and decoded UTF-8 text");
+        for (int topic = 0; topic < 18; ++topic)
         {
             help.selectTopic(topic);
             require(help.getDisplayedText().length() > 400, "Italian help topic contains instructions");
         }
         help.setLanguage(false);
-        require(help.getTopicCount() == 12 && help.getDisplayedText().contains("Troubleshooting"),
+        require(help.getTopicCount() == 18 && help.getDisplayedText().contains("installation and updates"),
                 "English guide switches language and preserves the selected topic");
-        for (int topic = 0; topic < 12; ++topic)
+        for (int topic = 0; topic < 18; ++topic)
         {
             help.selectTopic(topic);
             require(help.getDisplayedText().length() > 400, "English help topic contains instructions");
@@ -537,6 +628,19 @@ int main(int argc, char **argv)
                 require(button != nullptr, "new page navigation exists");
                 button->onClick();
                 FileOutputStream pageOut(File::getCurrentWorkingDirectory().getChildFile(String("lowline-") + page + "-preview.png"));
+                pageOut.setPosition(0); pageOut.truncate();
+                fmt.writeImageToStream(e->createComponentSnapshot(e->getLocalBounds()), pageOut);
+            }
+            auto *workspaceButton = dynamic_cast<TextButton *>(e->findChildWithID("tab-workspace"));
+            require(workspaceButton != nullptr, "workspace navigation exists");
+            workspaceButton->onClick();
+            LowlineWorkbench *workspace = nullptr;
+            for (auto *child : e->getChildren()) if (auto *w = dynamic_cast<LowlineWorkbench *>(child)) workspace = w;
+            require(workspace != nullptr, "workspace is a native component");
+            for (int page = 0; page < 5; ++page)
+            {
+                workspace->showPage(page);
+                FileOutputStream pageOut(File::getCurrentWorkingDirectory().getChildFile("lowline-workspace-"+String(page)+".png"));
                 pageOut.setPosition(0); pageOut.truncate();
                 fmt.writeImageToStream(e->createComponentSnapshot(e->getLocalBounds()), pageOut);
             }

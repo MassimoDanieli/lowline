@@ -1,4 +1,4 @@
-# Lowline 0.2 — User guide
+# Lowline 0.3 — User guide
 
 ## 01 · Start here
 Lowline is a bass rig combining a gate, compressor, booster, two NAM models, cabinet impulse response (IR), EQ, parallel clean signal, stereo delay and IR reverb. It runs as a standalone app or VST3 plugin; AU is also available on Mac.
@@ -25,7 +25,7 @@ Selected input → INPUT → gate → compressor → split into two branches.
 Processed branch: BOOST → NAM pedal → NAM amp → EQ → cabinet IR.
 Clean branch: optional CLEAN LP filter → CLEAN ALIGN → CLEAN PHASE.
 
-AMP / CLEAN combines the branches; next come stereo delay → IR reverb → OUTPUT → final limiter.
+AMP / CLEAN combines the branches; next come stereo delay → IR reverb → OUTPUT → temporary A/B trim → backing and click → final limiter → tuner mute. FX recording is tapped before backing, click and limiter; DI is tapped before INPUT.
 
 The clean branch starts AFTER the gate and compressor. “Clean” means without booster, NAM, EQ or cabinet, but it can still be compressed. Delay and reverb process the combined signal.
 
@@ -86,7 +86,7 @@ Models must be mono-in/mono-out .nam files. The core supports A2, but compatibil
 
 PEDAL and AMP display the declared loudness; “no metadata” means the slot is empty or lacks a valid value. In that case model gain stays unchanged: Lowline does not invent a measurement or automatically analyse perceived loudness. PEDAL compensation also changes the signal entering AMP and can affect its distortion. Physical input calibration in dBu remains manual.
 
-NAM/IR changes use a 50 ms crossfade between the previous engine and the new engine, prepared outside the audio callback. Rapid requests retain the most recent pending engine. CPU demand temporarily increases; a crossfade cannot guarantee that every combination of captures, phase and CPU load is inaudible. Long IR tails are not retained beyond the transition.
+NAM/IR changes use a 50 ms crossfade between the previous engine and the new engine, prepared outside the audio callback. Rapid requests retain the most recent pending engine. CPU demand temporarily increases; a crossfade cannot guarantee that every combination of captures, phase and CPU load is inaudible. One outgoing room tail may continue; see STAGE for behaviour and limits.
 
 TONE3000 opens the website in your browser: download a file yourself, then load it into the correct slot. There is no integrated downloader. No models or IRs are included.
 
@@ -143,7 +143,7 @@ On opening, embedded assets are extracted to a persistent Lowline/Assets cache i
 
 To preserve a sound, keep assets in a stable folder, save the preset and note which files it uses. To transfer an ordinary preset, copy and reload its assets too; alternatively use EXPORT to create a single portable file.
 
-The “x” clears a slot. Errors can indicate a missing file, incompatible format or wrong sample rate: read the status bar at the bottom. While Loading is displayed, wait for completion before judging the sound. Capture changes use a 50 ms crossfade. A complete preset applies controls and loads slots sequentially: it is not an atomic scene switch with every tail preserved.
+The “x” clears a slot. Errors can indicate a missing file, incompatible format or wrong sample rate: read the status bar at the bottom. While Loading is displayed, wait for completion before judging the sound. Capture changes use a 50 ms crossfade. A complete preset applies controls and prepares captures as a group: it is not an atomic scene switch with every tail preserved.
 
 Drag-and-drop:
 • Dropping a .nam anywhere in the window loads AMP; use PEDAL's own button for a pedal capture.
@@ -211,3 +211,53 @@ NAM fails to load: read the status bar, check mono model compatibility and the r
 Current limits: NAM normalisation requires valid loudness metadata; input and expression-pedal calibration remain manual; no guarantee of atomic scene changes or complete tail preservation. The 50 ms crossfade avoids an abrupt engine swap but temporarily increases CPU demand. The tuner is monophonic. No models or IRs are supplied.
 
 Automated builds check software using synthetic signals and test models. Latency, drop-outs, accuracy on real basses and listening results need verification with your Scarlett and host. Start with a 256-sample buffer and low volume; try 128 if the system remains stable.
+
+## 13 · Library, favourites and presets
+Open WORKSPACE → LIBRARY. ADD FILES indexes NAM captures, IRs and .lowline presets; SCAN FOLDER searches subfolders in the background without following symlinks, up to 10,000 files per scan. Files remain at their original paths. A red [MISSING] entry means a path is unavailable: remove the entry and add its new location. Removing an entry never deletes the actual file.
+
+Select NAM, IR or Preset and search by filename, path or tags. FAVOURITE +/- changes the star, Favourites only filters the list and Sort by recent prioritises last-loaded entries. Double-click or LOAD opens the selection; arrows follow the current filtered order. Pedal/Amp/Cab/Room chooses the destination; NAM always goes to a NAM slot and IR to an IR slot. SHOW FILE reveals the item in the operating system.
+
+The field beside TAG ITEM assigns local tags to the selected entry. Catalogue tags and preset tags are separate. Loading a preset imports its name and tags into the catalogue. The catalogue is stored in Lowline's user-data folder; favourites and recent history are not embedded in portable presets. Avoid editing it from multiple simultaneous instances: the latest catalogue save wins.
+
+The right-hand fields describe the CURRENT preset, not necessarily the selected row. Enter a name, tags and description, APPLY PRESET DETAILS, then SAVE or EXPORT in the rig. These details accompany the .lowline file. UNDO/REDO covers controls and editorial metadata, not asset loading, recording or catalogue operations. Each knob drag starts a transaction. History is temporary. The asterisk in STAGE indicates changes since saving/opening; practice settings and A/B match gain are temporary and excluded from that preset.
+
+## 14 · A/B comparison and measured levels
+WORKSPACE → COMPARE A/B holds two temporary snapshots of controls, MIDI mappings and the four capture paths. STORE A/B replaces that snapshot; RECALL A/B restores it. Wait for asset preparation. Snapshots neither embed files nor survive closing the instance: SAVE a preset to keep a sound. These are not two complete rigs processing continuously in parallel.
+
+To compare levels, configure A, press MEASURE 5 SECONDS and play a representative phrase. Store A after measurement finishes. Repeat for B. After recalling either snapshot, measure the same phrase again and MATCH TO A/B to compensate against the stored reference. Use the same instrument, physical gain and musical material; performance differences influence the result. RMS is measured on the processed bass's left channel before match gain, backing, metronome and the final limiter.
+
+Matching is bounded to ±12 dB and rejects measurements below −60 dB RMS. It is not LUFS or perceptual loudness analysis. Adjust the trim manually or RESET MATCH GAIN to return to 0 dB. A/B recall resets trim. This temporary trim affects monitoring and FX recording, is excluded from presets and does not change model input drive. Measured comparison is separate from NAM metadata normalisation. Excessive positive gain may engage the output limiter, so check the output meter as well as your ears.
+
+## 15 · Backing tracks, loops and metronome
+WORKSPACE → PRACTICE loads mono/stereo WAV or AIFF. Limits are ten minutes and 16 million samples per channel; at 48 kHz the sample limit is about 5 minutes 33 seconds, so not every ten-minute file qualifies. Decoding and stretching happen in memory on a worker. Backing and click are added after the bass chain and pass through the final limiter and tuner mute. Their volumes are independent of bass OUTPUT.
+
+PLAY/PAUSE controls playback. STOP/START stops and returns to the beginning. POSITION always refers to original-file seconds. LOOP START = NOW and LOOP END = NOW set the endpoints; enable LOOP for an interval of at least roughly 50 ms. Short boundary ramps reduce clicks but do not detect beats or transients. End must follow start. Pause and seek before changing an endpoint if you need precise placement.
+
+SPEED ranges from 0.50 to 1.50. APPLY SPEED prepares a new offline WSOLA rendering, approximately retaining pitch rather than simply changing playback rate. Completion stops playback, returns to the start and resets loop points. Complex material and transients may have audible artefacts; this is not mastering-grade stretching. The previous rendering may keep playing while a new one is prepared. Speed, file and loop are not saved in presets.
+
+The independent metronome offers 30–300 BPM, volume, 2–7 beats per measure and no accent, first-beat accent or accents on 2 and 4. For walking bass choose 4 beats and accents 2/4. It starts on beat 1 when enabled. It does not automatically follow the backing track, host transport or delay TAP tempo. Beat displays the current pulse. In a plugin, practice playback depends on the host continuing to process audio.
+
+## 16 · Quick DI + FX recording
+RECORD DI + FX asks for a name and folder, then creates name-DI.wav (mono) and name-FX.wav (stereo). Both are 32-bit floating-point WAVs at the current device/host sample rate. Float preserves values above 0 dBFS; reduce their playback level when importing into another application. Existing takes are never intentionally overwritten: choose a new name if either output file already exists.
+
+DI is the selected raw input before INPUT gain, gate, compressor and effects. FX is processed bass including A/B match gain, before the final monitor limiter and tuner mute. Backing and metronome are excluded from both files. Hardware latency is not represented; models and IRs may introduce their own delays. Import DI into a DAW and use Lowline as a plugin to change the sound afterwards.
+
+STOP RECORDING flushes the background writer queues and finalises both files. Reconfiguring audio or closing the instance also stops recording. The dropped-block counter reports buffer loss; a non-zero count means the take may contain gaps or alignment errors. Repeat with more audio buffer headroom and an available disk. Make a short test before an important take. Host bypass does not feed these features, so do not engage it during recording; Lowline's internal BYPASS still feeds the recording path. The counter is not a guarantee against every possible disk or hardware failure.
+
+## 17 · Stage view and sound changes
+STAGE provides a large preset name, dirty asterisk, tuner, preset arrows, TAP and bypass. Entering this page selects the Preset type in the Library; arrows follow its filtered/sorted list. Prepare favourites and search before playing. This is not yet a manually ordered setlist editor.
+
+With focus in this page, left/right arrows recall the previous/next preset, T toggles tuner and mute, and space triggers delay TAP. Existing MIDI mappings and PC 0–127 assignments remain active. TUNE/MUTE silences the monitored output including backing/click; the FX recording tap is before mute. Click the page to give it keyboard focus if the host has captured shortcuts.
+
+The four engines for a preset are prepared as a group before publication; there is no intermediate empty engine for every loaded file. Controls still apply before preparation completes, so this is NOT an atomic transaction for the complete sound. Existing transitions may defer adoption in an individual slot. Wait for loading and audition the result.
+
+An outgoing room IR can continue processing silence for its IR duration, with a final 100 ms ramp. Only one previous tail is retained and a further replacement may truncate it. Disabling room, clearing its slot, changing mix or bypassing can mask the tail. Previous delay settings and the entire old signal chain are not cloned. Overlap increases CPU usage and level; test your real models and changes before a performance. Crossfades cannot guarantee inaudible transitions under every phase or CPU condition.
+
+## 18 · Audio, installation and updates
+AUDIO / APP displays version, operating system, sample rate, prepared maximum block size, theoretical buffer duration, reported plugin latency and input/output levels. Diagnostics distinguish no detected signal, signal present and near-clipping input peaks. No signal can simply mean you are not playing: this is not an automatic cable test. COPY DIAGNOSTICS copies those values without file paths or credentials.
+
+The setup checklist explains input/output interface selection, bass input channel, INST and direct monitoring. Actual device settings remain in standalone Options or your DAW. One buffer's duration is NOT round-trip latency; drivers, input/output buffers and converters also contribute. A physical loopback measurement is required to establish actual latency.
+
+Mac packages are available as ZIP and DMG. README-INSTALL.txt and Install-Lowline.command are included: close the app and DAW, then run the helper to copy app and plugins into your user's folders without sudo. Existing bundles are renamed with a backup suffix. You can copy them manually instead. Public packages are NOT Developer-ID signed or notarised. Do not disable Gatekeeper: follow the package instructions and macOS Privacy & Security opening options.
+
+CHECK FOR UPDATES opens the latest GitHub Release in your browser. Compare its version with 0.3.0 shown in the app; no update is installed, downloaded or checked periodically in the background. For developers, scripts/sign-mac.sh provides an optional signing/notarisation path using a Developer ID identity and a notarytool Keychain profile you already configured. It requires an Apple Developer account and testing on a Mac; it is not used for unsigned public builds.

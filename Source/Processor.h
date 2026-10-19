@@ -2,6 +2,7 @@
 #include "Dsp.h"
 #include "Capture.h"
 #include "Tuner.h"
+#include "Studio.h"
 #include <juce_cryptography/juce_cryptography.h>
 #include <NAM/get_dsp.h>
 #include <condition_variable>
@@ -32,7 +33,26 @@ class LowlineProcessor : public juce::AudioProcessor
     void changeProgramName(int, const juce::String &) override {}
     void getStateInformation(juce::MemoryBlock &) override;
     void setStateInformation(const void *, int) override;
+    juce::UndoManager undo;
     juce::AudioProcessorValueTreeState state;
+    LowlineStudio studio;
+    std::atomic<float> compareTrim{0}, measuredRms{-100};
+    std::atomic<int> measureRemaining{0};
+    void measureLevel() { measureRequested = true; }
+    double audioRate() const { return rate; }
+    int audioBlock() const { return maxBlock; }
+    void storeComparison(int index);
+    bool recallComparison(int index);
+    void matchComparison(int reference);
+    bool hasComparison(int index) const { return index >= 0 && index < 2 && comparison[size_t(index)].getSize() > 0; }
+    juce::String presetName() const;
+    juce::String presetTags() const;
+    juce::String presetNotes() const;
+    void setPresetDetails(const juce::String &, const juce::String &, const juce::String &);
+    bool isDirty();
+    void markClean();
+    void recallProgram(int pc) { if (pc >= 0 && pc < 128) requestedProgram = pc; }
+
     std::atomic<float> inputPeak{0}, outputPeak{0}, gainReduction{0};
     std::atomic<bool> clipped{false}, busy{false};
     enum Slot
@@ -72,6 +92,9 @@ class LowlineProcessor : public juce::AudioProcessor
     void midi(const juce::MidiBuffer &);
     void workerLoop();
     void performLoad(Slot, const juce::File &);
+    std::unique_ptr<LowlineCapture> prepareCapture(Slot, const juce::File &, double, int);
+    void publishCapture(Slot, const juce::File &, std::unique_ptr<LowlineCapture>);
+
     void processChunk(juce::AudioBuffer<float> &, int, int);
     void limitOutput(juce::AudioBuffer<float> &);
     void setStatus(const juce::String &);
@@ -83,6 +106,7 @@ class LowlineProcessor : public juce::AudioProcessor
     juce::AudioBuffer<float> work, dry;
     std::array<LowlineCaptureSlot, 4> captures;
     juce::SpinLock modelLock;
+    juce::SpinLock publicationLock;
 
     std::array<std::atomic<bool>, 4> loaded{};
     mutable std::mutex metadataMutex;
@@ -94,6 +118,9 @@ class LowlineProcessor : public juce::AudioProcessor
     {
         Slot slot;
         juce::File file;
+        bool scene = false;
+        juce::String warning;
+        std::array<juce::File, 4> files;
     };
     std::deque<Job> jobs;
     bool stopping = false;
@@ -112,6 +139,13 @@ class LowlineProcessor : public juce::AudioProcessor
     std::array<std::atomic<bool>, 128> programAssigned{};
     std::atomic<int> requestedProgram{-1};
     std::atomic<double> lastTap{0};
+    std::array<juce::MemoryBlock, 2> comparison;
+    std::array<float, 2> comparisonRms{-100, -100};
+    juce::String cleanSignature;
+    std::atomic<bool> cleanWhenReady{false};
+    std::atomic<bool> measureRequested{false};
+    double measureEnergy = 0; int measureCount = 0;
+    lowline::Slew compareGain;
     lowline::Slew inputGain, outputGain, blend, drive, delayMix, reverbMix;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LowlineProcessor)
 };

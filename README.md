@@ -1,10 +1,10 @@
-# Lowline 0.2.0 — Bass NAM + IR rig
+# Lowline 0.3.0 — Bass NAM + IR rig
 
 A free, open-source native bass rig for macOS (Apple Silicon + Intel), Windows x64 and Linux x64. Standalone and VST3; AU is also built for macOS. Original project for Massimo Danieli, not affiliated with NamRay, Neural Amp Modeler or TONE3000.
 
 ## ⬇️ Scarica / Download
 
-**[🍎 Mac — Apple Silicon + Intel](https://github.com/MassimoDanieli/lowline/releases/download/v0.2.0/Lowline-macOS-universal.zip)** · **[Windows x64](https://github.com/MassimoDanieli/lowline/releases/download/v0.2.0/Lowline-Windows-x64.zip)** · **[Linux x64](https://github.com/MassimoDanieli/lowline/releases/download/v0.2.0/Lowline-Linux-x64.tar.gz)**
+**[🍎 Mac — Apple Silicon + Intel](https://github.com/MassimoDanieli/lowline/releases/download/v0.3.0/Lowline-macOS-universal.zip)** · **[Windows x64](https://github.com/MassimoDanieli/lowline/releases/download/v0.3.0/Lowline-Windows-x64.zip)** · **[Linux x64](https://github.com/MassimoDanieli/lowline/releases/download/v0.3.0/Lowline-Linux-x64.tar.gz)**
 
 App pronta all'uso: non serve compilare. / Ready-built app: no compilation needed.
 
@@ -12,7 +12,24 @@ App pronta all'uso: non serve compilare. / Ready-built app: no compilation neede
 
 ![Lowline rig](preview.png)
 
-## New in 0.2
+## New in 0.3
+
+- **Library:** folder indexing, NAM/IR/preset search, favourites, recent files, local tags and missing-file indicators.
+- **A/B:** two temporary rig snapshots and a five-second RMS comparison with bounded ±12 dB match gain.
+- **Practice:** WAV/AIFF backing player, loop points, offline pitch-preserving speed adjustment (0.5–1.5×), independent metronome with accents on beats 2 and 4.
+- **Recording:** separate mono DI and stereo FX 32-bit float WAVs, written off the audio thread; backing/click excluded.
+- **Presets:** name, tags, description, dirty indicator and control/metadata undo/redo.
+- **Stage:** large tuner and preset controls, keyboard shortcuts, grouped capture preparation and one outgoing room tail.
+- **Setup:** live audio diagnostics, setup checklist and on-demand link to the latest release.
+- **Mac installation:** DMG and ZIP with a per-user installation helper; public packages remain unsigned/unnotarised.
+
+[Mac DMG](https://github.com/MassimoDanieli/lowline/releases/download/v0.3.0/Lowline-macOS-universal.dmg) · [Installation instructions](packaging/README-INSTALL.txt)
+
+![Practice workspace](docs/practice-preview.png)
+
+![Personal library](docs/library-preview.png)
+
+## Rig features
 
 - Monophonic bass tuner (25–500 Hz), A4 reference and smooth mute; pitch analysis runs off the audio thread.
 - Noise gate with threshold, release, hysteresis and hold.
@@ -34,7 +51,7 @@ The rig also includes compression, saturation booster, NAM pedal and amp slots, 
 
 Download a package using the links above, or open [Releases](https://github.com/MassimoDanieli/lowline/releases/latest) and expand **Assets**. Choose the file for your operating system, not the automatically generated “Source code” archives. Extract the downloaded archive. Public release downloads do not require a GitHub account and do not have the 30-day Actions artifact expiry.
 
-The 0.2.0 packages passed [builds and regression tests on all three platforms](https://github.com/MassimoDanieli/lowline/actions/runs/39152945390).
+Release 0.3.0 is published automatically only after all three native build and regression-test jobs succeed. [Build history](https://github.com/MassimoDanieli/lowline/actions).
 
 On Mac, run the standalone app or install the AU/VST3 bundle in your user's Audio/Plug-Ins folders. The app is not Developer-ID signed or notarised. See the guide for installation and audio setup.
 
@@ -44,7 +61,7 @@ No NAM captures or IRs are bundled. TONE3000 opens the website; download compati
 
 ## Guides / Guide
 
-Click **GUIDA / HELP** for the built-in offline manual, with twelve indexed topics and language switching. The same files are published here:
+Click **GUIDA / HELP** for the built-in offline manual, with eighteen indexed topics and language switching. The same files are published here:
 
 - [Italiano — guida completa](docs/HELP_IT.md)
 - [English — complete guide](docs/HELP_EN.md)
@@ -60,7 +77,7 @@ Selected mono input → input gain → gate → compressor → split.
 Processed branch: booster → NAM pedal → NAM amp → five-band EQ → cabinet IR.
 Clean branch: optional low-pass → manual alignment → polarity.
 
-Blend → stereo delay → convolution reverb → output gain → 1 ms lookahead limiter → tuner mute.
+Blend → stereo delay → convolution reverb → output gain → temporary A/B trim → backing + click → 1 ms lookahead limiter → tuner mute.
 
 The clean branch includes gate/compression. Its low-pass does not high-pass the processed branch. Stereo input is summed or one channel is selected; stereo width comes from IRs and effects. Mono output folds both output channels together.
 
@@ -92,11 +109,13 @@ Mac universal: add `'-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64'` at configuration. 
 
 ## Practical limits
 
-Crossfades replace abrupt engine swaps, but temporarily run two engines per transitioning slot. Phase differences and CPU overruns can still be audible. Complete preset recall applies controls and loads slots sequentially; it is not an atomic scene switch, and long IR tails are not retained past the fade. There is no automatic model sample-rate conversion.
+Crossfades replace abrupt engine swaps, but temporarily run two engines per transitioning slot. Phase differences and CPU overruns can still be audible. Preset engines are prepared as a group, but controls apply before preparation finishes: this is not an atomic scene switch. One previous room tail may continue; another switch, clearing the room or changing the mix can truncate/mask it. There is no automatic model sample-rate conversion.
 
 The tuner is monophonic and can be confused by strong harmonics/noise. Gate, EQ and level settings require adjustment for the instrument. The booster is a simple host-rate saturation and can alias at high drive. The CPU display is callback time relative to its audio deadline, not total system utilisation.
 
 Software tests do not establish Scarlett round-trip latency, performance with arbitrary neural captures, DAW validation or real-world listening quality. See VALIDATION.md for what was actually checked.
+
+Practice settings, A/B snapshots and match trim are temporary and are not saved in rig presets. The metronome is independent of host/backing tempo. Time stretching is offline WSOLA and can smear transients. Backing files are limited to 10 minutes and 16M samples per channel. Recorded FX is before the final monitor limiter/mute; float WAVs can exceed 0 dBFS. Check the dropped-block counter and audition recorded files.
 
 ## License
 

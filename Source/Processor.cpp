@@ -68,12 +68,13 @@ LowlineProcessor::LowlineProcessor()
     : AudioProcessor(BusesProperties()
                          .withInput("Input", AudioChannelSet::stereo(), true)
                          .withOutput("Output", AudioChannelSet::stereo(), true)),
-      state(*this, nullptr, "Lowline", parameters())
+      state(*this, &undo, "Lowline", parameters())
 {
     for (auto *parameter : getParameters())
         if (auto *ranged = dynamic_cast<RangedAudioParameter *>(parameter)) midiTargets.push_back(ranged);
     resetMidiMappings();
     worker = std::thread([this] { workerLoop(); });
+    markClean();
 }
 LowlineProcessor::~LowlineProcessor()
 {
@@ -100,6 +101,8 @@ void LowlineProcessor::prepareToPlay(double sr, int n)
     work.setSize(2, maxBlock);
     dry.setSize(2, maxBlock);
     limiter.prepare(sr);
+    studio.prepare(sr, maxBlock);
+    compareGain.prepare(sr, 1);
     compressor.prepare(sr);
     delay.prepare(sr);
     dryDelay.prepare(sr);
@@ -225,6 +228,7 @@ void LowlineProcessor::processBlock(AudioBuffer<float> &buffer, MidiBuffer &m)
         peak = std::max(peak, buffer.getMagnitude(c, 0, buffer.getNumSamples()));
     inputPeak = peak;
     const double started = Time::getMillisecondCounterHiRes();
+    if (measureRequested.exchange(false)) { measureEnergy = 0; measureCount = 0; measureRemaining = int(rate.load()*5); measuredRms = -100; }
     float bpm = p("tempo");
     bool host = false;
     if (p("sync") && p("hostSync"))
@@ -236,7 +240,25 @@ void LowlineProcessor::processBlock(AudioBuffer<float> &buffer, MidiBuffer &m)
     usingHostTempo = host;
     effectiveDelay = p("sync") ? lowline::tempoDelay(bpm, int(p("division"))) : p("time");
     for (int off = 0; off < buffer.getNumSamples(); off += maxBlock)
-        processChunk(buffer, off, std::min(maxBlock.load(), buffer.getNumSamples() - off));
+    {
+        const int n = std::min(maxBlock.load(), buffer.getNumSamples() - off);
+        studio.captureInput(buffer, off, n, int(p("source")), getTotalNumInputChannels());
+        processChunk(buffer, off, n);
+        for (int i = off; i < off+n; ++i)
+        {
+            const float gain = compareGain.next(lowline::db(compareTrim));
+            if (measureRemaining > 0)
+            {
+                const float x = buffer.getSample(0,i);
+                measureEnergy += x*x; ++measureCount;
+                if (--measureRemaining == 0)
+                { measuredRms = lowline::toDb(float(std::sqrt(measureEnergy/std::max(1,measureCount)))); measureEnergy = 0; measureCount = 0; }
+            }
+            for (int c = 0; c < getTotalNumOutputChannels(); ++c) buffer.setSample(c,i,buffer.getSample(c,i)*gain);
+        }
+        studio.record(buffer, off, n, getTotalNumOutputChannels());
+        studio.mix(buffer, off, n, getTotalNumOutputChannels());
+    }
     limitOutput(buffer);
     const double budget = 1000.0 * buffer.getNumSamples() / rate.load();
     if (budget > 0) cpuLoad = .9f * cpuLoad.load() + .1f * float((Time::getMillisecondCounterHiRes() - started) / budget * 100);
@@ -275,6 +297,10 @@ void LowlineProcessor::processChunk(AudioBuffer<float> &out, int off, int n)
 {
     const float inTarget = lowline::db(p("input")), outTarget = lowline::db(p("output"));
     const bool bypass = p("bypass") > .5f;
+    {
+        const SpinLock::ScopedTryLockType publish(publicationLock);
+        if (publish.isLocked()) for (auto &capture : captures) capture.beginChunk();
+    }
     const int source = int(p("source")), inputs = getTotalNumInputChannels();
     for (int i = 0; i < n; ++i)
     {
@@ -303,7 +329,7 @@ void LowlineProcessor::processChunk(AudioBuffer<float> &out, int off, int n)
         work.copyFrom(1, 0, work, 0, 0, n);
         for (int stage = 0; stage < 2; ++stage)
             captures[size_t(stage)].process(work, n, p(stage == 0 ? "pedalOn" : "ampOn") > .5f,
-                                           p("normOn") > .5f, p("normTarget"));
+                                           p("normOn") > .5f, p("normTarget"), false);
         eq[0].peak(rate, 100, p("bass"));
         eq[1].peak(rate, p("lowMidFreq"), p("lowMid"));
         eq[2].peak(rate, p("midFreq"), p("mid"));
@@ -320,7 +346,7 @@ void LowlineProcessor::processChunk(AudioBuffer<float> &out, int off, int n)
         }
     }
     work.copyFrom(1, 0, work, 0, 0, n);
-    captures[Cab].process(work, n, !bypass && p("cabOn") > .5f, false, 0);
+    captures[Cab].process(work, n, !bypass && p("cabOn") > .5f, false, 0, false);
     const float polarity = p("invert") > .5f ? -1.f : 1.f;
     for (int i = 0; i < n; ++i)
     {
@@ -344,7 +370,7 @@ void LowlineProcessor::processChunk(AudioBuffer<float> &out, int off, int n)
     }
     dry.copyFrom(0, 0, work, 0, 0, n);
     dry.copyFrom(1, 0, work, 1, 0, n);
-    captures[Room].process(work, n, true, false, 0);
+    captures[Room].process(work, n, true, false, 0, false);
     for (int i = 0; i < n; ++i)
     {
         float rm = reverbMix.next(!bypass && loaded[Room] && p("reverbOn") > .5f ? p("reverbMix") * .01f : 0);
@@ -420,7 +446,18 @@ void LowlineProcessor::workerLoop()
         }
         try
         {
-            performLoad(job.slot, job.file);
+            if (job.scene)
+            {
+                const double sr = rate; const int bs = maxBlock;
+                std::array<std::unique_ptr<LowlineCapture>, 4> prepared;
+                for (int i = 0; i < 4; ++i) prepared[size_t(i)] = prepareCapture(Slot(i), job.files[size_t(i)], sr, bs);
+                const SpinLock::ScopedLockType setup(modelLock);
+                if (rate != sr || maxBlock != bs) throw std::runtime_error("Audio setup changed; recall preset again.");
+                const SpinLock::ScopedLockType publish(publicationLock);
+                for (int i = 0; i < 4; ++i) publishCapture(Slot(i), job.files[size_t(i)], std::move(prepared[size_t(i)]));
+                if (job.warning.isNotEmpty()) throw std::runtime_error(job.warning.toStdString());
+            }
+            else performLoad(job.slot, job.file);
         }
         catch (const std::exception &e)
         {
@@ -438,11 +475,9 @@ void LowlineProcessor::workerLoop()
         }
     }
 }
-void LowlineProcessor::performLoad(Slot slot, const File &file)
+std::unique_ptr<LowlineCapture> LowlineProcessor::prepareCapture(Slot slot, const File &file, double sr, int bs)
 {
     auto capture = std::make_unique<LowlineCapture>();
-    const double sr = rate.load();
-    const int bs = maxBlock.load();
     if (file != File{})
     {
         if (!file.existsAsFile()) throw std::runtime_error("File not found: " + file.getFileName().toStdString());
@@ -469,23 +504,33 @@ void LowlineProcessor::performLoad(Slot slot, const File &file)
                 throw std::runtime_error("Use a mono/stereo WAV or AIFF impulse response.");
             if (double(reader->lengthInSamples) / reader->sampleRate > (slot == Cab ? 2.0 : 20.0))
                 throw std::runtime_error("IR too long (cab 2 s / room 20 s maximum).");
+            capture->tailSeconds = slot == Room ? double(reader->lengthInSamples) / reader->sampleRate : 0;
             capture->ir = std::make_unique<dsp::Convolution>();
             capture->ir->loadImpulseResponse(file, dsp::Convolution::Stereo::yes, dsp::Convolution::Trim::no, 0,
                                              dsp::Convolution::Normalise::yes);
         }
     }
     capture->prepare(sr, bs);
+    return capture;
+}
+void LowlineProcessor::performLoad(Slot slot, const File &file)
+{
+    const double sr = rate; const int bs = maxBlock;
+    auto capture = prepareCapture(slot,file,sr,bs);
+    const SpinLock::ScopedLockType guard(modelLock);
+    if (rate != sr || maxBlock != bs) throw std::runtime_error("Audio setup changed; reload the file.");
+    const SpinLock::ScopedLockType publish(publicationLock);
+    publishCapture(slot,file,std::move(capture));
+}
+void LowlineProcessor::publishCapture(Slot slot, const File &file, std::unique_ptr<LowlineCapture> capture)
+{
+    if (slot < Cab)
     {
-        const SpinLock::ScopedLockType guard(modelLock);
-        if (rate != sr || maxBlock != bs) throw std::runtime_error("Audio setup changed; reload the file.");
-        if (slot < Cab)
-        {
-            normalisationAvailable[size_t(slot)] = capture->hasLoudness;
-            modelLoudness[size_t(slot)] = capture->loudness;
-        }
-        captures[size_t(slot)].publish(std::move(capture));
-        loaded[size_t(slot)] = file != File{};
+        normalisationAvailable[size_t(slot)] = capture->hasLoudness;
+        modelLoudness[size_t(slot)] = capture->loudness;
     }
+    captures[size_t(slot)].publish(std::move(capture));
+    loaded[size_t(slot)] = file != File{};
     {
         std::lock_guard g(metadataMutex);
         paths[slot] = file == File{} ? String() : file.getFullPathName();
@@ -502,6 +547,7 @@ void LowlineProcessor::setCurrentProgram(int i)
     if (i < 0 || i >= 4)
         return;
     program = i;
+    state.state.setProperty("presetName", getProgramName(i), nullptr);
     // Deterministic sound settings; preserve interface selection and input/output calibration.
     set("gateOn", 0); set("gateThreshold", -55); set("gateRelease", 150);
     set("lowMid", 0); set("highMid", 0);
@@ -598,13 +644,14 @@ void LowlineProcessor::setStateInformation(const void *data, int size)
     program = jlimit(0, 3, int(tree.getProperty("program", 0)));
     {
         std::lock_guard guard(jobsMutex);
+        Job scene; scene.slot = Pedal; scene.scene = true;
         for (int i = 0; i < 4; ++i)
         {
             auto path = tree.getProperty("file" + String(i)).toString();
-            jobs.push_back({(Slot)i, File{}});
-            if (path.isNotEmpty())
-                jobs.push_back({(Slot)i, File(path)});
+            scene.files[size_t(i)] = path.isNotEmpty() && File(path).existsAsFile() ? File(path) : File{};
+            if (path.isNotEmpty() && !File(path).existsAsFile()) scene.warning += "File not found: " + File(path).getFileName() + "; ";
         }
+        jobs.push_back(std::move(scene));
         busy = true;
     }
     jobsReady.notify_one();
@@ -642,7 +689,7 @@ void LowlineProcessor::savePreset(const File &f, bool portable)
     if (!temporary.getFile().replaceWithData(b.getData(), b.getSize()) || !temporary.overwriteTargetFileWithTemporary())
         setStatus("Cannot save preset");
     else
-        setStatus("Preset saved / Salvato");
+    { markClean(); setStatus("Preset saved / Salvato"); }
 }
 void LowlineProcessor::openPreset(const File &f, bool preserveMidi)
 {
@@ -698,6 +745,7 @@ void LowlineProcessor::openPreset(const File &f, bool preserveMidi)
     }
     auto extracted = tree.createXml(); b.reset(); copyXmlToBinary(*extracted, b);
     setStateInformation(b.getData(), (int)b.getSize());
+    cleanWhenReady = true;
     // Loader errors must remain visible instead of being overwritten by a success message.
 }
 AudioProcessorEditor *LowlineProcessor::createEditor()
@@ -707,4 +755,44 @@ AudioProcessorEditor *LowlineProcessor::createEditor()
 AudioProcessor *JUCE_CALLTYPE createPluginFilter()
 {
     return new LowlineProcessor();
+}
+
+String LowlineProcessor::presetName() const { return state.state.getProperty("presetName", "Clean foundation").toString(); }
+String LowlineProcessor::presetTags() const { return state.state.getProperty("presetTags").toString(); }
+String LowlineProcessor::presetNotes() const { return state.state.getProperty("presetNotes").toString(); }
+void LowlineProcessor::setPresetDetails(const String &name, const String &tags, const String &notes)
+{
+    undo.beginNewTransaction("Preset details");
+    state.state.setProperty("presetName", name.substring(0,120), &undo);
+    state.state.setProperty("presetTags", tags.substring(0,240), &undo);
+    state.state.setProperty("presetNotes", notes.substring(0,2000), &undo);
+}
+void LowlineProcessor::markClean()
+{
+    // Parameters and editorial metadata; asset jobs are checked separately by the UI.
+    MemoryBlock bytes; getStateInformation(bytes); cleanSignature = SHA256(bytes).toHexString();
+}
+bool LowlineProcessor::isDirty()
+{
+    if (cleanWhenReady && !busy) { cleanWhenReady = false; markClean(); }
+    MemoryBlock bytes; getStateInformation(bytes);
+    return cleanSignature.isEmpty() || cleanSignature != SHA256(bytes).toHexString();
+}
+void LowlineProcessor::storeComparison(int index)
+{
+    if (index < 0 || index > 1 || busy) return;
+    getStateInformation(comparison[size_t(index)]); comparisonRms[size_t(index)] = measuredRms;
+    setStatus(String("Stored / Memorizzato ") + (index == 0 ? "A" : "B"));
+}
+bool LowlineProcessor::recallComparison(int index)
+{
+    if (!hasComparison(index) || busy) return false;
+    auto &b = comparison[size_t(index)];
+    setStateInformation(b.getData(), int(b.getSize())); compareTrim = 0; return true;
+}
+void LowlineProcessor::matchComparison(int reference)
+{
+    if (reference < 0 || reference > 1 || comparisonRms[size_t(reference)] < -60 || measuredRms < -60)
+    { setStatus("Measure both sounds above -60 dB RMS / Misura entrambi i suoni"); return; }
+    compareTrim = juce::jlimit(-12.f, 12.f, comparisonRms[size_t(reference)] - measuredRms.load());
 }

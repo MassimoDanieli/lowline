@@ -1,3 +1,15 @@
+# 0.3.0
+
+- Add searchable personal NAM/IR/preset library, favourites, recents and tags.
+- Add temporary A/B rig snapshots and measured RMS level matching.
+- Add backing-track player, loops, offline WSOLA speed adjustment and accented metronome.
+- Add dual DI/FX 32-bit float WAV recording with background disk writers.
+- Add preset name/tags/description, dirty state and parameter/metadata undo/redo.
+- Add stage view, keyboard shortcuts, grouped capture preparation and room-tail carry-over.
+- Add audio setup checklist, diagnostic copy and on-demand release link.
+- Package a macOS DMG and per-user installation helper; prepare optional developer signing script.
+- Extend both offline guides to eighteen topics and add native workspace previews/regression checks.
+
 # Lowline 0.2.0
 
 - Added tuner with mute and A4 calibration, gate, five-band EQ and clean low-pass.

@@ -1,6 +1,7 @@
 #pragma once
 #include "Processor.h"
 #include "Help.h"
+#include "Workbench.h"
 class LowlineLook : public juce::LookAndFeel_V4
 {
   public:
@@ -53,7 +54,10 @@ class LowlineEditor : public juce::AudioProcessorEditor,
         rigTab{"RIG"}, toolsTab{"TOOLS"}, midiTab{"MIDI"}, tapButton{"TAP"},
         learnButton{"LEARN"}, cancelLearn{"CANCEL"}, clearMapping{"CLEAR"}, resetMapping{"RESET"},
         assignButton{"ASSIGN PRESET"}, unassignButton{"CLEAR PC"};
+    juce::TextButton workbenchTab{"WORKSPACE"};
+    std::unique_ptr<LowlineWorkbench> workbench;
     int page = 0;
+    int statusTicks = 0;
     juce::ComboBox division, midiTarget, midiProgram;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> divisionLink;
     juce::Label tunerLabel, syncLabel, normLabel, midiHint, assignmentLabel;

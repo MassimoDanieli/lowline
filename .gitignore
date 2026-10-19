@@ -11,3 +11,5 @@
 # Native screenshot outputs (published copies live in docs/ and preview.png)
 lowline-preview.png
 lowline-*-preview.png
+
+lowline-workspace-*.png

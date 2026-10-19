@@ -1,4 +1,4 @@
-# Lowline 0.2 — Guida utente
+# Lowline 0.3 — Guida utente
 
 ## 01 · Inizia da qui
 Lowline è un rig per basso: combina gate, compressore, booster, due modelli NAM, cassa a risposta impulsiva (IR), equalizzatore, suono pulito parallelo, delay stereo e riverbero IR. Funziona come app autonoma oppure come plugin VST3; su Mac è disponibile anche AU.
@@ -25,7 +25,7 @@ Ingresso selezionato → INPUT → gate → compressore → divisione in due ram
 Ramo elaborato: BOOST → NAM pedal → NAM amp → EQ → cassa IR.
 Ramo pulito: filtro CLEAN LP opzionale → CLEAN ALIGN → CLEAN PHASE.
 
-AMP / CLEAN unisce i due rami; seguono delay stereo → riverbero IR → OUTPUT → limiter finale.
+AMP / CLEAN unisce i due rami; seguono delay stereo → riverbero IR → OUTPUT → compensazione A/B temporanea → base e metronomo → limiter finale → mute accordatore. La registrazione FX è prelevata prima di base, metronomo e limiter; la DI prima di INPUT.
 
 Il ramo pulito parte DOPO gate e compressore: “pulito” significa senza booster, NAM, EQ e cassa, ma può essere compresso. Delay e riverbero agiscono sul mix dei due rami.
 
@@ -86,7 +86,7 @@ Sono accettati modelli .nam mono con ingresso e uscita mono. Il core supporta A2
 
 PEDAL e AMP mostrano il loudness dichiarato; “nessun dato” significa che la cattura è vuota o non include un dato valido. In quel caso Lowline lascia il guadagno del modello invariato: non inventa una misura e non fa un'analisi automatica del volume percepito. La compensazione del PEDAL modifica anche il livello che entra nell'AMP, quindi può cambiarne la saturazione. La calibrazione fisica d'ingresso in dBu resta manuale.
 
-Il cambio NAM/IR usa una dissolvenza di 50 ms fra il motore precedente e quello nuovo, preparato fuori dal callback audio. Se arrivano molte richieste, viene conservata quella più recente in attesa. Il carico aumenta temporaneamente; la dissolvenza non garantisce che ogni combinazione di catture, fase e carico CPU risulti inudibile. Le lunghe code IR non vengono mantenute oltre la transizione.
+Il cambio NAM/IR usa una dissolvenza di 50 ms fra il motore precedente e quello nuovo, preparato fuori dal callback audio. Se arrivano molte richieste, viene conservata quella più recente in attesa. Il carico aumenta temporaneamente; la dissolvenza non garantisce che ogni combinazione di catture, fase e carico CPU risulti inudibile. Una coda del riverbero precedente può continuare; vedi PALCO per limiti e comportamento.
 
 TONE3000 apre il sito nel browser: scarica tu il file e poi caricalo nello slot corretto. Non c'è un downloader integrato. Modelli e IR non sono inclusi.
 
@@ -143,7 +143,7 @@ All'apertura gli asset incorporati vengono estratti in una cache persistente Low
 
 Per conservare un suono: tieni gli asset in una cartella stabile, salva il preset e annota quali file usi. Per trasferire un preset normale copia anche gli asset e ricaricali; in alternativa usa ESPORTA per ottenere un unico file portabile.
 
-La “x” cancella un file dallo slot. Un messaggio di errore può indicare un file mancante, un formato incompatibile o una frequenza errata: controlla la barra di stato in basso. Durante Loading attendi il completamento prima di valutare il suono. Il cambio cattura usa una dissolvenza di 50 ms. Un preset completo applica i controlli e carica gli slot in successione: non è un cambio scena atomico con tutte le code preservate.
+La “x” cancella un file dallo slot. Un messaggio di errore può indicare un file mancante, un formato incompatibile o una frequenza errata: controlla la barra di stato in basso. Durante Loading attendi il completamento prima di valutare il suono. Il cambio cattura usa una dissolvenza di 50 ms. Un preset completo applica i controlli e prepara le catture come gruppo: non è un cambio scena atomico con tutte le code preservate.
 
 Trascinamento:
 • Un .nam sulla finestra va nello slot AMP; per PEDAL usa il suo pulsante.
@@ -211,3 +211,53 @@ NAM non caricato: leggi la barra di stato, verifica file mono compatibile e samp
 Limiti attuali: normalizzazione NAM solo quando è presente un loudness valido; calibrazione d'ingresso e dei pedali d'espressione manuale; nessuna garanzia di cambio scena atomico o mantenimento completo delle code. La dissolvenza di 50 ms evita il cambio secco del motore ma aumenta temporaneamente il costo CPU. L'accordatore è monofonico. Nessun modello o IR è fornito di serie.
 
 Le build automatiche verificano il software con segnali sintetici e modelli di prova. Latenza, drop-out, accuratezza su bassi reali e risultato all'ascolto devono essere provati sulla Scarlett e nel tuo host. Inizia con buffer 256 e volume basso; prova poi 128 se il sistema rimane stabile.
+
+## 13 · Libreria, preferiti e preset
+Apri AREA STUDIO → LIBRERIA. AGGIUNGI FILE inserisce catture NAM, IR o preset .lowline; SCANSIONA CARTELLA cerca anche nelle sottocartelle, senza seguire collegamenti simbolici, fino a 10.000 file per scansione. La scansione avviene in background. I file non vengono copiati: non spostarli dopo averli indicizzati. Una voce rossa [MISSING] segnala un percorso non più disponibile; rimuovila dall'elenco e aggiungi il nuovo percorso.
+
+Scegli NAM, IR o Preset e cerca nel nome, nel percorso o nei tag. PREFERITO +/- modifica la stella; Solo preferiti filtra l'elenco e Ordina per recenti porta in alto gli ultimi elementi caricati. Doppio clic o CARICA apre la selezione; le frecce percorrono l'ordine corrente. Il selettore Pedal/Amp/Cab/Room sceglie la destinazione: un NAM viene sempre indirizzato a uno slot NAM e un IR a uno slot IR. MOSTRA FILE apre la cartella nel sistema operativo. RIMUOVI DALLA LISTA non cancella il file.
+
+Il campo accanto a TAG VOCE assegna tag alla voce selezionata. I tag del catalogo sono locali; quelli del preset sono separati. Caricando un preset si importano nel catalogo il suo nome e i suoi tag. Il catalogo viene conservato nei dati utente di Lowline; preferiti e recenti non vengono incorporati nei preset portabili. Evita modifiche simultanee del catalogo in più istanze: viene mantenuto l'ultimo salvataggio.
+
+A destra puoi modificare nome, tag e descrizione del preset CORRENTE. Premi APPLICA DATI PRESET, poi SALVA o ESPORTA nel rig. Questi dati accompagnano il file .lowline. ANNULLA/RIPRISTINA agisce sui controlli e sui dati editoriali; non annulla il caricamento dei file, la registrazione o le operazioni del catalogo. Ogni trascinamento di una manopola apre una nuova transazione. La cronologia è temporanea. L'asterisco nella pagina PALCO indica modifiche rispetto all'ultimo salvataggio/apertura; i controlli dello studio e la compensazione A/B sono temporanei e non fanno parte di quel preset.
+
+## 14 · Confronto A/B e volume misurato
+AREA STUDIO → CONFRONTO A/B conserva due istantanee temporanee di controlli, mappa MIDI e percorsi delle quattro catture. MEMORIZZA A/B sostituisce la rispettiva istantanea; ASCOLTA A/B la richiama. Attendi il caricamento dei modelli. Le istantanee non contengono i file e non sopravvivono alla chiusura dell'istanza: usa SALVA per conservarle. Non sono due rig elaborati continuamente in parallelo.
+
+Per confrontare il volume: imposta il suono A, premi MISURA 5 SECONDI e suona una frase rappresentativa. Alla fine premi MEMORIZZA A. Ripeti con B. Dopo ogni richiamo misura nuovamente la stessa frase e scegli ALLINEA AD A/B per compensare il livello rispetto al riferimento memorizzato. Usa lo stesso basso, gain e frase: una diversa esecuzione altera il risultato. Il numero RMS è misurato sul canale sinistro del basso elaborato, prima della compensazione, della base, del metronomo e del limiter finale.
+
+La compensazione è limitata a ±12 dB e rifiuta misure inferiori a −60 dB RMS. Non è una misura LUFS né un'analisi percettiva. La manopola consente un'aggiustatura manuale; AZZERA COMPENSAZIONE ritorna a 0 dB. Il richiamo A/B azzera il trim. Il trim influenza ascolto e registrazione FX, resta fuori dai preset e non modifica la spinta all'ingresso dei modelli. La misura non sostituisce la normalizzazione NAM basata sui metadati.
+
+## 15 · Basi, loop e metronomo
+AREA STUDIO → STUDIO carica una base WAV/AIFF mono o stereo. Limiti: dieci minuti e 16 milioni di campioni per canale; a 48 kHz il secondo limite equivale a circa 5 minuti e 33 secondi. Non tutti i file di dieci minuti rientrano quindi nel limite. Il file è decodificato in memoria fuori dal callback audio. Base e metronomo vengono aggiunti dopo la catena del basso e passano nel limiter finale e nel mute dell'accordatore. I rispettivi volumi sono indipendenti da OUTPUT del basso.
+
+PLAY/PAUSA controlla la riproduzione. STOP/INIZIO ferma e torna all'inizio. POSIZIONE usa sempre i secondi del file originale. INIZIO LOOP = ORA e FINE LOOP = ORA fissano i due punti; attiva LOOP ON/OFF per ripetere un intervallo di almeno circa 50 ms. Il loop ha brevi rampe ai bordi, ma non riconosce automaticamente battute o transienti. La fine deve seguire l'inizio. Prima di cambiare intervallo, metti in pausa e posizionati nel punto desiderato.
+
+VELOCITÀ varia fra 0,50 e 1,50. Premi APPLICA VELOCITÀ: il file viene rielaborato in background con WSOLA, mantenendo approssimativamente la tonalità anziché cambiare semplicemente frequenza di riproduzione. Al completamento playback, posizione e punti loop vengono azzerati. Sui transienti o su materiale complesso possono comparire artefatti; non è uno stretching di qualità da mastering. Durante la preparazione può continuare la vecchia base. Velocità e loop non sono salvati nei preset.
+
+Il metronomo ha tempo 30–300 BPM, volume, misura da 2 a 7 pulsazioni e tre scelte di accento: nessuno, primo battito, oppure 2 e 4. Per il walking bass scegli misura 4 e accenti 2 e 4. Parte dal primo battito quando viene attivato ed è indipendente da base, tempo host e TAP del delay: non sincronizza automaticamente una canzone. Il numero Beat mostra la pulsazione corrente. In un plugin, base e click suonano soltanto quando l'host continua a elaborare audio.
+
+## 16 · Registrazione rapida DI + FX
+REGISTRA DI + FX apre la scelta di nome e cartella. Dal nome scelto vengono creati due file: nome-DI.wav mono e nome-FX.wav stereo. Entrambi sono WAV a 32 bit float alla frequenza corrente dell'interfaccia/host. Il float conserva anche valori oltre 0 dBFS: abbassa il volume quando li importi in un altro programma. Lowline rifiuta di sovrascrivere una coppia già esistente.
+
+DI contiene l'ingresso selezionato prima di INPUT, gate, compressore ed effetti. FX contiene il basso elaborato e l'eventuale trim A/B, prima del limiter finale e del mute dell'accordatore. Base e metronomo non sono inclusi: sono strumenti di ascolto durante la registrazione. La coppia non include la latenza hardware; alcuni modelli/IR possono introdurre propri ritardi. Usa DI per rielaborare il suono in seguito nella tua DAW, con Lowline come plugin.
+
+FERMA REGISTRAZIONE svuota le code di scrittura e finalizza i WAV. Anche un cambio di configurazione audio o la chiusura dell'istanza interrompe la registrazione. La scrittura su disco è delegata a un thread; il contatore dropped blocks segnala eventuali blocchi persi per sovraccarico. Se è diverso da zero, la take potrebbe avere interruzioni o disallineamenti: ripeti con un buffer maggiore e un disco disponibile. Registra una breve prova prima di una take importante. Il bypass dell'host non alimenta queste funzioni; evita di attivarlo durante una take. Il pulsante BYPASS interno lascia invece attivo il percorso di registrazione.
+
+## 17 · Palco e cambi di suono
+PALCO presenta nome del preset, asterisco delle modifiche, accordatore grande, frecce preset, TAP e bypass. Entrando nella pagina viene selezionato il tipo Preset nella Libreria; le frecce seguono l'elenco filtrato e ordinato della libreria. Prepara quindi la selezione di preferiti e la ricerca prima di suonare. Non è ancora un editor di scalette con un ordine manuale.
+
+Con il focus nella pagina, freccia sinistra/destra richiama il preset precedente/successivo, T attiva o spegne accordatore e mute, spazio aziona TAP del delay. Il MIDI configurato nella scheda MIDI continua a funzionare e permette di richiamare i file assegnati a PC 0–127. ACCORDA/MUTE silenzia l'uscita ascoltata, incluse base e click; la registrazione FX è presa prima del mute.
+
+Per un preset le quattro catture vengono preparate come gruppo prima della pubblicazione; non si inserisce più un motore vuoto prima di ogni file. I controlli del preset vengono comunque applicati prima che la preparazione finisca: il richiamo NON è una transazione atomica dell'intero suono. Le transizioni già in corso possono ritardare l'adozione di uno slot. Attendi il messaggio di caricamento e controlla il risultato.
+
+Il riverbero precedente può continuare a elaborare il silenzio per la durata della sua IR, con rampa finale di 100 ms. Si conserva al massimo una coda precedente; un altro cambio può troncarla. Disattivare il riverbero, rimuovere lo slot, cambiare mix o usare il bypass può mascherare la coda. Non si clonano le impostazioni precedenti del delay o dell'intera catena. La sovrapposizione aumenta il costo CPU e il livello: prova i cambi reali prima di un'esibizione.
+
+## 18 · Audio, installazione e aggiornamenti
+AUDIO / APP mostra versione, sistema operativo, sample rate, massimo blocco preparato, durata teorica del buffer, latenza dichiarata del plugin e livelli di ingresso/uscita. La diagnostica distingue segnale assente, presente e picco prossimo al clipping. Un segnale assente può anche significare che non stai suonando: non è una diagnosi automatica del cavo. COPIA DIAGNOSTICA copia questi dati negli appunti, senza indirizzi di file o credenziali.
+
+La configurazione guidata ricorda di scegliere ingresso e uscita della stessa interfaccia, il canale corretto, INST e direct monitoring. Le vere impostazioni del dispositivo restano nel menu Options dello standalone o nella DAW. Il valore di un buffer non è la latenza di andata e ritorno: servono anche i buffer di ingresso/uscita, i driver e i convertitori. Per misurarla occorre una prova fisica di loopback.
+
+I download Mac sono disponibili come ZIP e DMG. Il pacchetto include README-INSTALL.txt e Install-Lowline.command: chiudi app e DAW, poi usa il comando per copiare app e plugin nelle cartelle del tuo utente senza sudo. Le copie precedenti vengono rinominate con un suffisso di backup. È possibile anche copiare manualmente i bundle. Firma Developer ID e notarizzazione NON sono state effettuate: non disattivare Gatekeeper; consulta le istruzioni del pacchetto e le opzioni di Privacy e sicurezza di macOS.
+
+CONTROLLA AGGIORNAMENTI apre nel browser la pagina della Release più recente. Confronta il numero con 0.3.0 visualizzato nell'app; non vengono scaricati o installati aggiornamenti automaticamente e non viene eseguito alcun controllo periodico. Per gli sviluppatori scripts/sign-mac.sh prepara il percorso di firma e notarizzazione con un'identità e un profilo notarytool già configurati nel Portachiavi: richiede un account Apple Developer e una verifica su Mac, non è parte della build pubblica non firmata.

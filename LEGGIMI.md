@@ -1,13 +1,10 @@
-# Lowline 0.2 — Inizia da qui
+# Lowline 0.3.0
 
-Lowline è un rig per basso per Mac, Windows e Linux. Usa l'app autonoma oppure il plugin VST3; su Mac è disponibile anche AU.
+[Scarica per Mac, Windows e Linux](https://github.com/MassimoDanieli/lowline/releases/latest).
+Su Mac puoi scegliere DMG o ZIP; nel pacchetto trovi istruzioni e un comando di installazione nelle cartelle del tuo utente.
 
-Premi **GUIDA** nell'app per il manuale offline completo. Puoi leggerlo anche qui: [Italiano](docs/HELP_IT.md) · [English](docs/HELP_EN.md).
+Apri AREA STUDIO per libreria e preferiti, confronto A/B, basi e loop, metronomo, registrazione DI/FX, modalità palco e diagnostica audio.
 
-Le schede sono **RIG**, **STRUMENTI** e **MIDI**. La versione 0.2 aggiunge accordatore, gate, EQ a cinque bande, filtro sul pulito, normalizzazione NAM da metadati, sync e tap del delay, MIDI learn, preset portabili e dissolvenze nei cambi NAM/IR.
+La [guida completa in italiano](docs/HELP_IT.md) è inclusa anche nel pulsante GUIDA dell'app. Disponibile anche [in inglese](docs/HELP_EN.md).
 
-Scarica un pacchetto da una compilazione riuscita di [GitHub Actions](https://github.com/MassimoDanieli/lowline/actions). Estrai lo ZIP e poi l'archivio di piattaforma contenuto al suo interno. Per Mac scegli Lowline-macOS-universal. L'app non è notarizzata Apple.
-
-Con la Scarlett: attiva INST, scegli ingresso e uscita corretti e disattiva il direct monitoring. Parti da 48 kHz e buffer 128/256; controlla il sample rate richiesto dal modello. I file NAM e IR vanno caricati separatamente.
-
-SALVA conserva percorsi ai file; ESPORTA incorpora gli asset in un preset portabile. Le associazioni MIDI vengono salvate nei preset e nelle sessioni. Consulta la guida per configurarli e VALIDATION.md per i limiti delle verifiche.
+Le build pubbliche Mac non sono firmate Developer ID né notarizzate. I test software non sostituiscono la prova con la propria interfaccia e i propri modelli. Consulta [VALIDATION.md](VALIDATION.md) per verifiche e limiti.
