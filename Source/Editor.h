@@ -9,13 +9,15 @@ class LowlineLook : public juce::LookAndFeel_V4
     void drawRotarySlider(juce::Graphics &, int, int, int, int, float, float, float, juce::Slider &) override;
     void drawButtonBackground(juce::Graphics &, juce::Button &, const juce::Colour &, bool, bool) override;
 };
-class LowlineEditor : public juce::AudioProcessorEditor,
-                      private juce::Timer,
-                      public juce::FileDragAndDropTarget
+// The whole interface, laid out at its design size (1180 x 830).
+class LowlineView : public juce::Component,
+                    private juce::Timer,
+                    public juce::FileDragAndDropTarget
 {
   public:
-    explicit LowlineEditor(LowlineProcessor &);
-    ~LowlineEditor() override;
+    static constexpr int designWidth = 1180, designHeight = 830;
+    explicit LowlineView(LowlineProcessor &);
+    ~LowlineView() override;
     void paint(juce::Graphics &) override;
     void resized() override;
     bool isInterestedInFileDrag(const juce::StringArray &) override;
@@ -67,4 +69,18 @@ class LowlineEditor : public juce::AudioProcessorEditor,
     juce::Label statusLabel, subtitle, meterLabel;
     std::unique_ptr<juce::FileChooser> chooser;
     std::unique_ptr<LowlineHelpWindow> helpWindow;
+};
+// Resizable window: the view is scaled to fit (fixed aspect ratio); the size is remembered.
+class LowlineEditor : public juce::AudioProcessorEditor
+{
+  public:
+    explicit LowlineEditor(LowlineProcessor &);
+    ~LowlineEditor() override;
+    void resized() override;
+    void paint(juce::Graphics &g) override { g.fillAll(juce::Colour(0xff11151b)); }
+    LowlineView &getView() { return view; }
+    static juce::File sizeFile();
+
+  private:
+    LowlineView view;
 };

@@ -146,7 +146,8 @@ To preserve a sound, keep assets in a stable folder, save the preset and note wh
 The “x” clears a slot. Errors can indicate a missing file, incompatible format or wrong sample rate: read the status bar at the bottom. While Loading is displayed, wait for completion before judging the sound. Capture changes use a 50 ms crossfade. A complete preset applies controls and prepares captures as a group: it is not an atomic scene switch with every tail preserved.
 
 Drag-and-drop:
-• Dropping a .nam anywhere in the window loads AMP; use PEDAL's own button for a pedal capture.
+• A file dropped on a slot row (PEDAL, AMP, CAB, ROOM) loads into that slot; elsewhere a .nam loads AMP.
+• Resize the window from its corner: the interface scales and keeps its proportions (50 % to 200 %). It fits the screen the first time and then remembers the last size.
 • Dropping an IR in the upper area loads CAB; the lower effects row loads ROOM.
 • Dropping a .lowline opens that preset.
 

@@ -146,7 +146,8 @@ Per conservare un suono: tieni gli asset in una cartella stabile, salva il prese
 La “x” cancella un file dallo slot. Un messaggio di errore può indicare un file mancante, un formato incompatibile o una frequenza errata: controlla la barra di stato in basso. Durante Loading attendi il completamento prima di valutare il suono. Il cambio cattura usa una dissolvenza di 50 ms. Un preset completo applica i controlli e prepara le catture come gruppo: non è un cambio scena atomico con tutte le code preservate.
 
 Trascinamento:
-• Un .nam sulla finestra va nello slot AMP; per PEDAL usa il suo pulsante.
+• Un file lasciato su una riga di slot (PEDAL, AMP, CAB, ROOM) va in quello slot; altrove un .nam va in AMP.
+• La finestra si ridimensiona trascinando l'angolo: l'interfaccia si scala mantenendo le proporzioni (dal 50 % al 200 %). Alla prima apertura si adatta allo schermo; poi ricorda l'ultima dimensione.
 • Una IR nella zona superiore va a CAB; nella riga inferiore degli effetti va a ROOM.
 • Un .lowline apre il preset.
 

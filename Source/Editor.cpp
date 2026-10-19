@@ -57,7 +57,7 @@ void LowlineLook::drawButtonBackground(Graphics &g, Button &b, const Colour &, b
     g.setColour(b.getToggleState() ? mint : Colour(0xff526780));
     g.drawRoundedRectangle(r, 7, 1);
 }
-LowlineEditor::LowlineEditor(LowlineProcessor &p) : AudioProcessorEditor(p), proc(p)
+LowlineView::LowlineView(LowlineProcessor &p) : proc(p)
 {
     setLookAndFeel(&look);
     auto knob = [this](const char *id, const char *label, const char *suffix)
@@ -204,12 +204,12 @@ LowlineEditor::LowlineEditor(LowlineProcessor &p) : AudioProcessorEditor(p), pro
     timerCallback();
     startTimerHz(20);
 }
-LowlineEditor::~LowlineEditor()
+LowlineView::~LowlineView()
 {
     stopTimer();
     setLookAndFeel(nullptr);
 }
-void LowlineEditor::translate()
+void LowlineView::translate()
 {
     displayedLanguage = proc.getLanguage();
     bool it = displayedLanguage == "IT";
@@ -230,7 +230,7 @@ void LowlineEditor::translate()
         helpWindow->setLanguage(it);
     repaint();
 }
-void LowlineEditor::panel(Graphics &g, Rectangle<int> r, const String &title, Colour accent)
+void LowlineView::panel(Graphics &g, Rectangle<int> r, const String &title, Colour accent)
 {
     g.setColour(card);
     g.fillRoundedRectangle(r.toFloat(), 13);
@@ -240,7 +240,7 @@ void LowlineEditor::panel(Graphics &g, Rectangle<int> r, const String &title, Co
     g.setFont(Font(13.f, Font::bold));
     g.drawText(title, r.reduced(18).removeFromTop(22), Justification::centredLeft);
 }
-void LowlineEditor::paint(Graphics &g)
+void LowlineView::paint(Graphics &g)
 {
     g.fillAll(bg);
     g.setColour(mint);
@@ -278,19 +278,19 @@ void LowlineEditor::paint(Graphics &g)
                    : "GATE > COMP > BOOST > NAM PEDAL > NAM AMP > EQ > CAB + CLEAN > DELAY > IR REVERB",
                24, 765, 1132, 20, Justification::centred);
 }
-void LowlineEditor::placeKnob(const char *id, Rectangle<int> r)
+void LowlineView::placeKnob(const char *id, Rectangle<int> r)
 {
     auto &k = *knobs.at(id);
     k.slider.setVisible(true); k.label.setVisible(true);
     k.label.setBounds(r.removeFromTop(21));
     k.slider.setBounds(r);
 }
-void LowlineEditor::placeToggle(const char *id, Rectangle<int> r)
+void LowlineView::placeToggle(const char *id, Rectangle<int> r)
 {
     toggles.at(id)->button.setVisible(true);
     toggles.at(id)->button.setBounds(r);
 }
-void LowlineEditor::resized()
+void LowlineView::resized()
 {
     if (workbench) { workbench->setVisible(page == 3); workbench->setBounds(24,122,1132,637); }
     workbenchTab.setBounds(346,92,148,24);
@@ -379,7 +379,7 @@ void LowlineEditor::resized()
     placeKnob("reverbMix", {1025, 635, 116, 112});
 
 }
-void LowlineEditor::timerCallback()
+void LowlineView::timerCallback()
 {
     if (displayedLanguage != proc.getLanguage())
         translate();
@@ -435,11 +435,11 @@ void LowlineEditor::timerCallback()
         String(it ? "\nPC 0-3: preset di fabbrica se non assegnati. Mappa MIDI e banco PC sono globali e si salvano da soli."
                   : "\nPC 0-3: factory presets when unassigned. The MIDI map and PC bank are global and saved automatically."), dontSendNotification);
 }
-void LowlineEditor::choose(LowlineProcessor::Slot slot)
+void LowlineView::choose(LowlineProcessor::Slot slot)
 {
     chooser = std::make_unique<FileChooser>(slot < 2 ? "Load NAM capture" : "Load impulse response", File{},
                                             slot < 2 ? "*.nam" : "*.wav;*.aiff;*.aif");
-    Component::SafePointer<LowlineEditor> safe(this);
+    Component::SafePointer<LowlineView> safe(this);
     chooser->launchAsync(FileBrowserComponent::openMode | FileBrowserComponent::canSelectFiles,
                          [safe, slot](const FileChooser &c)
                          {
@@ -447,12 +447,12 @@ void LowlineEditor::choose(LowlineProcessor::Slot slot)
                                  safe->proc.loadFile(slot, c.getResult());
                          });
 }
-void LowlineEditor::preset(bool save, bool portable)
+void LowlineView::preset(bool save, bool portable)
 {
     chooser = std::make_unique<FileChooser>(
         save ? "Save Lowline preset" : "Open Lowline preset",
         File::getSpecialLocation(File::userDocumentsDirectory).getChildFile("My bass.lowline"), "*.lowline");
-    Component::SafePointer<LowlineEditor> safe(this);
+    Component::SafePointer<LowlineView> safe(this);
     chooser->launchAsync((save ? FileBrowserComponent::saveMode | FileBrowserComponent::warnAboutOverwriting
                                : FileBrowserComponent::openMode) |
                              FileBrowserComponent::canSelectFiles,
@@ -468,11 +468,11 @@ void LowlineEditor::preset(bool save, bool portable)
                              }
                          });
 }
-bool LowlineEditor::isInterestedInFileDrag(const StringArray &files)
+bool LowlineView::isInterestedInFileDrag(const StringArray &files)
 {
     return files.size() == 1 && (File(files[0]).hasFileExtension("nam;wav;aiff;aif;lowline"));
 }
-void LowlineEditor::filesDropped(const StringArray &files, int x, int y)
+void LowlineView::filesDropped(const StringArray &files, int x, int y)
 {
     if (files.isEmpty())
         return;
@@ -497,14 +497,57 @@ void LowlineEditor::filesDropped(const StringArray &files, int x, int y)
                   f);
 }
 
-void LowlineEditor::assignMidiPreset()
+void LowlineView::assignMidiPreset()
 {
     const int pc = midiProgram.getSelectedId() - 1;
     chooser = std::make_unique<FileChooser>("Assign .lowline preset to PC " + String(pc), File{}, "*.lowline");
-    Component::SafePointer<LowlineEditor> safe(this);
+    Component::SafePointer<LowlineView> safe(this);
     chooser->launchAsync(FileBrowserComponent::openMode | FileBrowserComponent::canSelectFiles,
         [safe, pc](const FileChooser &choice)
         {
             if (safe && choice.getResult().existsAsFile()) safe->proc.assignProgram(pc, choice.getResult());
         });
+}
+
+File LowlineEditor::sizeFile()
+{
+    return LowlineProcessor::midiSettingsFile().getSiblingFile("window.xml");
+}
+LowlineEditor::LowlineEditor(LowlineProcessor &p) : AudioProcessorEditor(p), view(p)
+{
+    view.setComponentID("lowline-view");
+    addAndMakeVisible(view);
+    constexpr double ratio = double(LowlineView::designWidth) / LowlineView::designHeight;
+    setResizable(true, true);
+    setResizeLimits(LowlineView::designWidth / 2, LowlineView::designHeight / 2, LowlineView::designWidth * 2,
+                    LowlineView::designHeight * 2);
+    getConstrainer()->setFixedAspectRatio(ratio);
+    int width = 0;
+    if (auto xml = XmlDocument::parse(sizeFile()))
+        width = xml->getIntAttribute("width");
+    if (width <= 0)
+    {
+        // First opening: as large as possible up to 100 %, never taller than the screen.
+        width = LowlineView::designWidth;
+        if (auto *display = Desktop::getInstance().getDisplays().getPrimaryDisplay())
+        {
+            const auto area = display->userArea.reduced(20, 40);
+            width = jmin(width, area.getWidth(), int(area.getHeight() * ratio));
+        }
+    }
+    width = jlimit(LowlineView::designWidth / 2, LowlineView::designWidth * 2, width);
+    setSize(width, int(std::round(width / ratio)));
+}
+LowlineEditor::~LowlineEditor()
+{
+    XmlElement xml("LowlineWindow");
+    xml.setAttribute("width", getWidth());
+    if (sizeFile().getParentDirectory().createDirectory().wasOk()) xml.writeTo(sizeFile());
+}
+void LowlineEditor::resized()
+{
+    const float scale = jmin(getWidth() / float(LowlineView::designWidth), getHeight() / float(LowlineView::designHeight));
+    view.setBounds(0, 0, LowlineView::designWidth, LowlineView::designHeight);
+    view.setTransform(AffineTransform::scale(scale).translated((getWidth() - LowlineView::designWidth * scale) / 2,
+                                                              (getHeight() - LowlineView::designHeight * scale) / 2));
 }

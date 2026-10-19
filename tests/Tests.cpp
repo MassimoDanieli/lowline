@@ -634,9 +634,15 @@ int main(int argc, char **argv)
         LowlineProcessor preview;
         preview.prepareToPlay(48000, 256);
         std::unique_ptr<AudioProcessorEditor> e(preview.createEditor());
-        require(e->getWidth() == 1180 && e->getHeight() == 830, "native editor opens with all controls");
+        auto *ui = e->findChildWithID("lowline-view");
+        require(ui != nullptr && ui->getWidth() == 1180 && ui->getHeight() == 830, "native editor opens with all controls");
+        require(e->isResizable() && std::abs(e->getWidth() / double(e->getHeight()) - 1180.0 / 830) < .01,
+                "editor is resizable with a fixed aspect ratio");
+        e->setSize(590, 415);
+        require(ui->getTransform().getScaleFactor() < .51f && e->getWidth() == 590, "the interface scales with the window");
+        e->setSize(1180, 830); // previews at design size
         LowlineWorkbench *practiceView = nullptr;
-        for (auto *child : e->getChildren()) if (auto *view = dynamic_cast<LowlineWorkbench *>(child)) practiceView = view;
+        for (auto *child : ui->getChildren()) if (auto *view = dynamic_cast<LowlineWorkbench *>(child)) practiceView = view;
         require(practiceView != nullptr,"practice workspace constructed");
         auto *accentChoice = dynamic_cast<ComboBox *>(practiceView->findChildWithID("practice-accents"));
         require(accentChoice && accentChoice->getSelectedId()==2 && accentChoice->getText().isNotEmpty(),"translated metronome retains selected accent");
@@ -644,7 +650,7 @@ int main(int argc, char **argv)
         require(accentChoice->getSelectedId()==2 && accentChoice->getText().contains("1"),"language change preserves metronome selection");
         preview.setLanguage("IT");practiceView->showPage(0);
 
-        auto *helpButton = dynamic_cast<TextButton *>(e->findChildWithID("lowline-help"));
+        auto *helpButton = dynamic_cast<TextButton *>(ui->findChildWithID("lowline-help"));
         require(helpButton != nullptr && bool(helpButton->onClick), "editor exposes its help action");
         LowlineHelpContent help(true);
         require(help.getTopicCount() == 18 && help.getDisplayedText().containsChar(0x00e8),
@@ -677,18 +683,18 @@ int main(int argc, char **argv)
             std::cout << png.getFullPathName() << "\n";
             for (const auto *page : {"tools", "midi"})
             {
-                auto *button = dynamic_cast<TextButton *>(e->findChildWithID(String("tab-") + page));
+                auto *button = dynamic_cast<TextButton *>(ui->findChildWithID(String("tab-") + page));
                 require(button != nullptr, "new page navigation exists");
                 button->onClick();
                 FileOutputStream pageOut(File::getCurrentWorkingDirectory().getChildFile(String("lowline-") + page + "-preview.png"));
                 pageOut.setPosition(0); pageOut.truncate();
                 fmt.writeImageToStream(e->createComponentSnapshot(e->getLocalBounds()), pageOut);
             }
-            auto *workspaceButton = dynamic_cast<TextButton *>(e->findChildWithID("tab-workspace"));
+            auto *workspaceButton = dynamic_cast<TextButton *>(ui->findChildWithID("tab-workspace"));
             require(workspaceButton != nullptr, "workspace navigation exists");
             workspaceButton->onClick();
             LowlineWorkbench *workspace = nullptr;
-            for (auto *child : e->getChildren()) if (auto *w = dynamic_cast<LowlineWorkbench *>(child)) workspace = w;
+            for (auto *child : ui->getChildren()) if (auto *w = dynamic_cast<LowlineWorkbench *>(child)) workspace = w;
             require(workspace != nullptr, "workspace is a native component");
             for (int page = 0; page < 5; ++page)
             {
