@@ -96,6 +96,18 @@ int main(int argc, char **argv)
         require(lowline::platform::isPreset(File("/x/a.radice")) && lowline::platform::isPreset(File("/x/a.lowline"))
                     && !lowline::platform::isPreset(File("/x/a.nam")),
                 "both .radice and .lowline files are recognised as presets");
+        // An existing Radice folder (e.g. created by the standalone's own settings on Windows)
+        // must not block copying a file that is still missing.
+        base.getChildFile("Lowline/window.xml").replaceWithText("<LowlineWindow width=\"900\"/>");
+        lowline::platform::appData(base);
+        require(migrated.getChildFile("window.xml").existsAsFile(), "a missing settings file is copied even if the Radice folder exists");
+        auto oldSettings = base.getChildFile("Old/Lowline.settings"), newSettings = base.getChildFile("New/Radice.settings");
+        oldSettings.create(); oldSettings.replaceWithText("<PROPERTIES><VALUE name=\"audioSetup\"/></PROPERTIES>");
+        require(lowline::platform::migrateStandaloneSettings(oldSettings, newSettings) && newSettings.loadFileAsString().contains("audioSetup")
+                    && !lowline::platform::migrateStandaloneSettings(oldSettings, newSettings),
+                "the standalone audio setup is carried over once from Lowline.settings");
+        require(lowline::platform::standaloneSettings("Radice").getDefaultFile().getFileName() == "Radice.settings",
+                "the standalone settings path follows JUCE's naming");
         base.deleteRecursively();
     }
     try

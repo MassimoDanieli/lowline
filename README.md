@@ -24,8 +24,8 @@ App pronta all'uso: non serve compilare. / Ready-built app: no compilation neede
 
 - The plugin keeps its internal codes and bundle ID, so DAW sessions made with Lowline load Radice in its place.
 - `.lowline` presets open as before; new presets are saved as `.radice`.
-- MIDI map, Program Change bank and library are copied from the Lowline settings on first launch (the originals are left in place).
-- Mac: the installer moves an existing Lowline app/AU/VST3 aside, because two plugins with the same codes confuse hosts. If you install by hand, remove the old `Lowline.*` bundles yourself. Windows/Linux: delete the old `Lowline.vst3` when you copy `Radice.vst3`.
+- MIDI map, Program Change bank, library, window size and the standalone app's audio setup are copied from Lowline on first launch (the originals are left in place).
+- Mac: the installer moves an existing Lowline app/AU/VST3 in your user folders aside, because two plugins with the same codes confuse hosts. If you installed Lowline by hand (for example in /Library/Audio/Plug-Ins), remove the old `Lowline.*` bundles yourself. Windows/Linux: delete the old `Lowline.vst3` when you copy `Radice.vst3`.
 
 ## New in 0.3
 

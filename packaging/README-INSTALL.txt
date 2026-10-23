@@ -1,6 +1,11 @@
 RADICE / INSTALLAZIONE — INSTALLATION
 
 ITALIANO
+Radice si chiamava Lowline. Se avevi Lowline, elimina i vecchi Lowline.app,
+Lowline.component e Lowline.vst3 (su Mac Install-Radice.command lo fa per te
+nelle cartelle del tuo utente): due plugin con gli stessi codici confondono
+le DAW. Le sessioni e i preset .lowline si aprono con Radice.
+
 Mac: apri il DMG o estrai lo ZIP. Chiudi Radice e la tua DAW.
 Puoi copiare manualmente Standalone/Radice.app in ~/Applications,
 AU/Radice.component in ~/Library/Audio/Plug-Ins/Components e
@@ -20,6 +25,11 @@ Linux: estrai il tar.gz. Esegui Standalone/Radice e copia il bundle VST3
 in ~/.vst3. Sono richieste librerie audio/grafiche compatibili con Ubuntu 24.04.
 
 ENGLISH
+Radice was called Lowline. If you had Lowline, delete the old Lowline.app,
+Lowline.component and Lowline.vst3 (on Mac Install-Radice.command does it
+for you in your user folders): two plugins with the same codes confuse
+hosts. Sessions and .lowline presets open in Radice.
+
 Mac: open the DMG or extract the ZIP. Close Radice and your DAW.
 Copy Standalone/Radice.app to ~/Applications,
 AU/Radice.component to ~/Library/Audio/Plug-Ins/Components and

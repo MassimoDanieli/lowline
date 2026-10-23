@@ -12,7 +12,7 @@ For your first session:
 6. Select Clean foundation. You can play without loading any models: empty slots pass the signal through.
 7. Load an amp .nam model and, if needed, a cabinet IR. Enable AMP ON and CAB ON, then adjust AMP / CLEAN and OUTPUT.
 
-Radice was called Lowline up to version 0.4. DAW sessions and .lowline presets still open; new presets are saved as .radice. The MIDI map, Program Change bank and library are carried over from the old installation automatically.
+Radice was called Lowline up to version 0.4. DAW sessions and .lowline presets still open; new presets are saved as .radice. On first launch the MIDI map, Program Change bank, library and, in the standalone app, the audio setup and last sound are copied from Lowline. Remove the old Lowline plugins: two plugins with the same codes confuse hosts (on Mac the installer does it for you).
 
 Green means a button is active; a dark button is off. The word “ON” is a fixed label: use the colour to identify the state. An active button does not mean a file has been loaded into that slot.
 

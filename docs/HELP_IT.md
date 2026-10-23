@@ -12,7 +12,7 @@ Per una prima prova:
 6. Scegli Clean foundation. Puoi già suonare senza modelli: gli slot vuoti lasciano passare il segnale.
 7. Carica un modello amp .nam e, se serve, una cassa IR. Attiva AMP ON e CAB ON, quindi regola AMP / CLEAN e OUTPUT.
 
-Radice si chiamava Lowline fino alla versione 0.4. Le sessioni delle DAW e i preset .lowline continuano ad aprirsi; i nuovi preset si salvano come .radice. Mappa MIDI, banco Program Change e libreria vengono ripresi automaticamente dalla vecchia installazione.
+Radice si chiamava Lowline fino alla versione 0.4. Le sessioni delle DAW e i preset .lowline continuano ad aprirsi; i nuovi preset si salvano come .radice. Al primo avvio vengono copiati da Lowline mappa MIDI, banco Program Change, libreria e, nell'app autonoma, impostazioni audio e ultimo suono. Rimuovi i vecchi plugin Lowline: due plugin con gli stessi codici confondono le DAW (su Mac l'installer lo fa per te).
 
 Il verde indica un pulsante attivo; un pulsante scuro è spento. Le parole “ON” sono etichette fisse: guarda il colore per conoscere lo stato. Una spia attiva non significa che nello slot sia stato caricato un file.
 

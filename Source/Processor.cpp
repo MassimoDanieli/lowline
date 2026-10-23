@@ -995,6 +995,13 @@ AudioProcessorEditor *LowlineProcessor::createEditor()
 {
     return new LowlineEditor(*this);
 }
+namespace
+{
+// JUCE's standalone app reads <product>.settings before it creates the processor, so the copy
+// from Lowline.settings has to happen while the binary loads. It is a file-exists check
+// otherwise, and harmless in a plugin host.
+const bool standaloneSettingsMigrated = lowline::platform::migrateStandaloneSettings();
+}
 AudioProcessor *JUCE_CALLTYPE createPluginFilter()
 {
     return new LowlineProcessor();

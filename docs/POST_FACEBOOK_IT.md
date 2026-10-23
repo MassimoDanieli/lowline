@@ -1,27 +1,28 @@
-🎸 Vi presento Lowline: un rig virtuale per basso, gratuito e open source, per Mac, Windows e Linux.
+Lowline cambia nome: da oggi si chiama Radice. 🎸
 
-L'idea è avere nello stesso programma gli strumenti per costruire il proprio suono e quelli per studiare: colleghi il basso a un'interfaccia audio e puoi suonare in cuffia, registrare o sperimentare con amplificatori, casse ed effetti.
+Radice come la nota fondamentale dell'accordo, quella che suona il basso. Mi sembrava il nome giusto per un progetto che parte proprio da lì.
 
-🔊 Il cuore del suono è Neural Amp Modeler (NAM), che utilizza catture del comportamento di amplificatori e pedali. Lowline offre due slot NAM, per pedale/preamp e ampli, più caricamento di IR per la cassa e il riverbero. I file non sono inclusi: puoi usare i tuoi oppure cercarne di compatibili, per esempio su TONE3000.
+Per chi se lo fosse perso: è un rig virtuale per basso, gratuito e open source, per Mac, Windows e Linux. Colleghi il basso al computer con un'interfaccia audio e hai tutta la catena in un unico posto: catture NAM per pedale e amplificatore, cassa tramite IR, compressore, booster, gate, EQ a cinque bande, delay, riverbero e limiter. Funziona da solo o come plugin VST3 (e Audio Unit su Mac).
 
-🎛️ La catena comprende compressore, booster con saturazione, noise gate, EQ a cinque bande, segnale pulito miscelabile e filtrabile, delay stereo con ping-pong e tap tempo, riverbero a convoluzione, accordatore e limiter in uscita. Una libreria con ricerca, preferiti e file recenti aiuta a organizzare i suoni; il confronto A/B permette di confrontare due configurazioni, anche compensandone il volume con una misura RMS.
+Nei giorni scorsi è cresciuto parecchio:
 
-🎵 Per studiare puoi caricare una base WAV/AIFF, ripetere un passaggio in loop, cambiarne la velocità mantenendo approssimativamente la tonalità e usare il metronomo con accenti personalizzabili, compresi il 2 e il 4 per il walking bass.
+🎧 Per studiare
+Un lettore di basi WAV/AIFF con loop e velocità regolabile senza cambiare l'intonazione, più un metronomo con accento su 2 e 4.
 
-🔴 La registrazione rapida salva due WAV separati: il basso pulito e quello elaborato. Così puoi conservare un'idea e cambiare il suono in seguito nella tua DAW.
+⏺ Per registrare
+Registra in contemporanea il segnale pulito del basso e quello elaborato, in due file separati: puoi rifare il suono dopo, senza risuonare.
 
-I preset possono includere modelli e IR, quando le rispettive licenze ne consentono la condivisione. Ci sono MIDI learn, richiamo dei preset da pedaliera e una pagina palco con controlli e accordatore grandi.
+📚 Per organizzarsi
+Una libreria con ricerca, preferiti e tag per catture, IR e preset, e un confronto A/B tra due suoni allo stesso volume, così il confronto è onesto.
 
-💻 Funziona da solo oppure come plugin VST3; su Mac anche Audio Unit, con supporto Apple Silicon e Intel. Interfaccia e guida completa sono disponibili in italiano e inglese.
+🎤 Per il palco
+Una modalità con accordatore grande e preset ben visibili, scorciatoie da tastiera e pedaliere MIDI, anche Bluetooth.
 
-È un progetto personale ancora in sviluppo: feedback, segnalazioni e contributi sono benvenuti. I test automatici aiutano, ma le prove con bassi, interfacce e modelli diversi sono fondamentali. Le build Mac non sono ancora firmate e notarizzate da Apple: trovate le istruzioni nel pacchetto.
+Le sessioni e i preset fatti con Lowline si aprono con Radice senza fare nulla: impostazioni, mappa MIDI e libreria vengono riprese da sole.
 
-👉 Download e progetto:
-https://github.com/MassimoDanieli/lowline/releases/latest
+Interfaccia e guida sono in italiano e inglese. Come sempre mi servono le vostre prove con strumenti, interfacce e catture diverse: segnalazioni e suggerimenti sono preziosi.
 
-👉 Codice e documentazione:
-https://github.com/MassimoDanieli/lowline
+👉 Download e istruzioni:
+https://github.com/MassimoDanieli/radice
 
-Se lo provate, raccontatemi con quale basso e quale suono lo state usando! 🎶
-
-#Lowline #BassoElettrico #NeuralAmpModeler #OpenSource #HomeRecording
+#Radice #BassoElettrico #BassGuitar #NeuralAmpModeler #OpenSource #HomeRecording

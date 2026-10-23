@@ -1,5 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_data_structures/juce_data_structures.h>
 
 // iPad / iPhone files. An iOS app lives in a sandbox: a file picked in the Files app is only
 // borrowed (security-scoped URL) and the app's own container path changes on every update.
@@ -34,20 +35,40 @@ inline juce::File documents()
     return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
 }
 // Settings, library and portable-asset cache. The app was called Lowline until 0.4: its small
-// settings files are copied (never moved) on first use, so an older build keeps working and
-// sessions that point into the old asset cache still find their files there.
+// settings files are copied (never moved) when Radice does not have them yet, so an older build
+// keeps working and sessions that point into the old asset cache still find their files there.
+// Each file is checked on its own: an existing (even empty) Radice folder never blocks the copy.
 inline juce::File appData(const juce::File &base = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory))
 {
     auto now = base.getChildFile("Radice");
-    if (!now.isDirectory())
-    {
-        now.createDirectory();
-        const auto old = base.getChildFile("Lowline");
-        for (const char *name : {"midi-controller.xml", "library.xml"})
-            if (old.getChildFile(name).existsAsFile())
-                old.getChildFile(name).copyFileTo(now.getChildFile(name));
-    }
+    now.createDirectory();
+    const auto old = base.getChildFile("Lowline");
+    for (const char *name : {"midi-controller.xml", "library.xml", "window.xml", "standalone.xml"})
+        if (!now.getChildFile(name).existsAsFile() && old.getChildFile(name).existsAsFile())
+            old.getChildFile(name).copyFileTo(now.getChildFile(name));
     return now;
+}
+// The standalone app's own settings (audio device, last sound) live in a file JUCE names after
+// the product, so it changed from Lowline.settings to Radice.settings. Same options as JUCE's
+// StandaloneFilterApp; copied before the app reads them (see Processor.cpp).
+inline juce::PropertiesFile::Options standaloneSettings(const juce::String &productName)
+{
+    juce::PropertiesFile::Options options;
+    options.applicationName = productName;
+    options.filenameSuffix = ".settings";
+    options.osxLibrarySubFolder = "Application Support";
+   #if JUCE_LINUX || JUCE_BSD
+    options.folderName = "~/.config";
+   #endif
+    return options;
+}
+inline bool migrateStandaloneSettings(const juce::File &from = standaloneSettings("Lowline").getDefaultFile(),
+                                      const juce::File &to = standaloneSettings("Radice").getDefaultFile())
+{
+    if (to.existsAsFile() || !from.existsAsFile())
+        return false;
+    to.getParentDirectory().createDirectory();
+    return from.copyFileTo(to);
 }
 // Preset files are .radice; presets saved as .lowline by earlier versions still open.
 inline bool isPreset(const juce::File &f) { return f.hasFileExtension("radice;lowline"); }

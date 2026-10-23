@@ -3,8 +3,8 @@
 **Lowline is now Radice**
 - New name: Radice, the root note — the one the bass plays. App, plugin, guides, packages and releases use the new name.
 - DAW sessions keep loading: the plugin codes and bundle ID are unchanged. `.lowline` presets still open; new presets are saved as `.radice`.
-- First launch copies the MIDI map, Program Change bank and library from the Lowline settings folder (the originals stay in place). Sessions that point into the old portable-asset cache still find their files there.
-- Mac installer: an existing Lowline app, AU and VST3 are moved aside, so hosts never see two plugins with the same codes.
+- First launch copies the MIDI map, Program Change bank, library, window size and the standalone app's audio setup and last sound from Lowline (the originals stay in place). Sessions that point into the old portable-asset cache still find their files there.
+- Mac installer: an existing Lowline app, AU and VST3 in your user folders are moved aside, so hosts do not see two plugins with the same codes. Copies installed by hand elsewhere (e.g. /Library/Audio/Plug-Ins) or on Windows/Linux must be removed manually.
 - Download links in the README always point to the latest release.
 - The Audio/App page shows the running version instead of a fixed "0.3.0".
 
