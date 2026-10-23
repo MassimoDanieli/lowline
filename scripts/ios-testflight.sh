@@ -1,8 +1,9 @@
 #!/bin/bash
-# Lowline for iPad / iPhone -> TestFlight, from your Mac, with Xcode's automatic signing.
+# Radice for iPad / iPhone -> TestFlight, from your Mac, with Xcode's automatic signing.
 #
 # Once:  1. Xcode (16 or newer) > Settings > Accounts: sign in with your Apple Developer account.
-#        2. App Store Connect > Apps > + New App: iOS, bundle ID com.massimodanieli.lowline
+#        2. App Store Connect > Apps > + New App: iOS, name Radice, bundle ID com.massimodanieli.lowline
+#           (the bundle ID keeps its original value; only the visible name changed).
 #           (register it under Certificates, Identifiers & Profiles if it is not offered).
 # Then:  LOWLINE_TEAM_ID=XXXXXXXXXX scripts/ios-testflight.sh
 #        The build shows up in App Store Connect > TestFlight after Apple's processing (~10-30 min).
@@ -33,4 +34,4 @@ cat > "$out/ExportOptions.plist" <<PLIST
 PLIST
 xcodebuild -exportArchive -archivePath "$out/Lowline.xcarchive" -exportOptionsPlist "$out/ExportOptions.plist" \
   -exportPath "$out/export" -allowProvisioningUpdates
-echo "Uploaded Lowline build $build_number. Add testers in App Store Connect > TestFlight."
+echo "Uploaded Radice build $build_number. Add testers in App Store Connect > TestFlight."

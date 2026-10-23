@@ -170,7 +170,7 @@ File &LowlineProcessor::settingsOverride()
 File LowlineProcessor::midiSettingsFile()
 {
     const auto folder = settingsOverride() != File{} ? settingsOverride()
-        : File::getSpecialLocation(File::userApplicationDataDirectory).getChildFile("Lowline");
+        : lowline::platform::appData();
     return folder.getChildFile("midi-controller.xml");
 }
 ValueTree LowlineProcessor::midiSettingsTree() const
@@ -931,7 +931,7 @@ bool LowlineProcessor::buildPreset(const File &f, MemoryBlock &out)
     auto xml = getXmlFromBinary(b.getData(), (int)b.getSize());
     if (!xml || !xml->hasTagName("Lowline"))
     {
-        setStatus("Invalid Lowline preset");
+        setStatus("Invalid Radice preset");
         return false;
     }
     auto tree = ValueTree::fromXml(*xml);
@@ -947,7 +947,7 @@ bool LowlineProcessor::buildPreset(const File &f, MemoryBlock &out)
         const String ext = tree.getProperty("ext" + String(slot)).toString().toLowerCase();
         if (total > 192LL * 1024 * 1024 || (slot < 2 ? ext != ".nam" : !StringArray{".wav", ".aif", ".aiff"}.contains(ext)))
         { setStatus("Invalid portable asset type or size."); return false; }
-        auto cache = File::getSpecialLocation(File::userApplicationDataDirectory).getChildFile("Lowline/Assets");
+        auto cache = lowline::platform::appData().getChildFile("Assets");
         if (cache.createDirectory().failed()) { setStatus("Cannot create asset cache."); return false; }
         // The name is the content hash: an existing file of the same size is already that asset,
         // so Program Change switching does not re-hash large IRs every time.

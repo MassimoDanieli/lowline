@@ -1,16 +1,18 @@
-# Lowline 0.3 — User guide
+# Radice 0.5 — User guide
 
 ## 01 · Start here
-Lowline is a bass rig combining a gate, compressor, booster, two NAM models, cabinet impulse response (IR), EQ, parallel clean signal, stereo delay and IR reverb. It runs as a standalone app or VST3 plugin; AU is also available on Mac.
+Radice is a bass rig combining a gate, compressor, booster, two NAM models, cabinet impulse response (IR), EQ, parallel clean signal, stereo delay and IR reverb. It runs as a standalone app or VST3 plugin; AU is also available on Mac.
 
 For your first session:
 1. Connect your bass to the Scarlett, enable INST on that input and turn down your headphone volume.
 2. In the standalone app open Options / Audio settings and choose Scarlett for both input and output. If “Mute audio input” is shown, disable it to hear your instrument.
-3. Select Input 1 / Left or Input 2 / Right in Lowline to match the socket you use.
+3. Select Input 1 / Left or Input 2 / Right in Radice to match the socket you use.
 4. Start at 48 kHz with a 128- or 256-sample buffer. If your NAM model requires another sample rate, select that rate and reload it.
 5. Turn off Scarlett direct monitoring to hear only the processed signal.
 6. Select Clean foundation. You can play without loading any models: empty slots pass the signal through.
 7. Load an amp .nam model and, if needed, a cabinet IR. Enable AMP ON and CAB ON, then adjust AMP / CLEAN and OUTPUT.
+
+Radice was called Lowline up to version 0.4. DAW sessions and .lowline presets still open; new presets are saved as .radice. The MIDI map, Program Change bank and library are carried over from the old installation automatically.
 
 Green means a button is active; a dark button is off. The word “ON” is a fixed label: use the colour to identify the state. An active button does not mean a file has been loaded into that slot.
 
@@ -33,14 +35,14 @@ Input 1 / Left uses the first channel; Input 2 / Right uses the second when avai
 
 Drag a knob to change it; double-click to restore the parameter's default value. You can also edit the number below a knob and press Enter.
 
-SAVE and OPEN manage .lowline presets. EXPORT creates a portable preset containing the loaded models and IRs. The upper-right menu offers four factory starting configurations. IT / EN on the main screen changes the interface language; technical control names remain in English.
+SAVE and OPEN manage .radice presets. EXPORT creates a portable preset containing the loaded models and IRs. The upper-right menu offers four factory starting configurations. IT / EN on the main screen changes the interface language; technical control names remain in English.
 
 ## 03 · Levels, CPU and tuner
 INPUT: −36 to +24 dB. Adjusts the signal before the compressor and models. Increasing it can drive a NAM capture harder; it does more than increase final loudness.
 
 OUTPUT: −36 to +12 dB. Adjusts level after the effects and before the limiter. Start at −6 dB and compare sounds at similar loudness.
 
-Set the Scarlett's physical gain first: hard playing should not clip its input. Turning down Lowline OUTPUT cannot repair distortion already caused at the audio interface input.
+Set the Scarlett's physical gain first: hard playing should not clip its input. Turning down Radice OUTPUT cannot repair distortion already caused at the audio interface input.
 
 IN and OUT show audio-block peaks in dBFS, not perceived loudness. IN refers to the incoming signal before software input gain. Values near −180 dB indicate numerical silence. GR shows compressor gain reduction in dB.
 
@@ -84,7 +86,7 @@ A capture may already include a cabinet and microphone. In that case try CAB off
 
 Models must be mono-in/mono-out .nam files. The core supports A2, but compatibility and CPU demand depend on the capture. If the required sample rate differs from the device rate, follow the status message, change the rate and reload the model. NORMALISE in TOOLS enables level compensation based on the NAM model's loudness metadata. NAM TARGET sets the reference from −30 to −6 dB; correction is limited to ±18 dB per model and applied gradually. The default target is −18 dB.
 
-PEDAL and AMP display the declared loudness; “no metadata” means the slot is empty or lacks a valid value. In that case model gain stays unchanged: Lowline does not invent a measurement or automatically analyse perceived loudness. PEDAL compensation also changes the signal entering AMP and can affect its distortion. Physical input calibration in dBu remains manual.
+PEDAL and AMP display the declared loudness; “no metadata” means the slot is empty or lacks a valid value. In that case model gain stays unchanged: Radice does not invent a measurement or automatically analyse perceived loudness. PEDAL compensation also changes the signal entering AMP and can affect its distortion. Physical input calibration in dBu remains manual.
 
 NAM/IR changes use a 50 ms crossfade between the previous engine and the new engine, prepared outside the audio callback. Rapid requests retain the most recent pending engine. CPU demand temporarily increases; a crossfade cannot guarantee that every combination of captures, phase and CPU load is inaudible. One outgoing room tail may continue; see STAGE for behaviour and limits.
 
@@ -135,11 +137,11 @@ Enabling REVERB ON without a loaded IR does not create a reverb. The file determ
 IR normalisation is handled by the convolution engine; this does not automatically match NAM model loudness. The IR's initial timing is preserved. Longer IRs may use more resources: try a shorter IR or a larger buffer if playback breaks up.
 
 ## 09 · Presets, files and drag-and-drop
-SAVE creates a lightweight .lowline preset with controls, language and absolute NAM/IR file paths. The MIDI map and the Program Change bank are not part of presets: they belong to your controller (see MIDI). DAW sessions retain the same state. OPEN reads both ordinary and portable presets.
+SAVE creates a lightweight .radice preset with controls, language and absolute NAM/IR file paths. The MIDI map and the Program Change bank are not part of presets: they belong to your controller (see MIDI). DAW sessions retain the same state. OPEN reads both ordinary and portable presets.
 
-EXPORT creates a portable .lowline containing copies of the models and IRs loaded in all four slots. Limits are 64 MB per asset and 192 MB total; missing or oversized assets cancel export. Wait for Loading to finish before saving. Embed and share only assets you have permission to redistribute.
+EXPORT creates a portable .radice containing copies of the models and IRs loaded in all four slots. Limits are 64 MB per asset and 192 MB total; missing or oversized assets cancel export. Wait for Loading to finish before saving. Embed and share only assets you have permission to redistribute.
 
-On opening, embedded assets are extracted to a persistent Lowline/Assets cache in your user application-data folder. Original paths are no longer required. Subsequent ordinary saves refer to the cache: use EXPORT again to move them to another computer. Paths to other presets assigned to Program Changes are not recursively embedded; transfer those presets separately and reassign them if needed.
+On opening, embedded assets are extracted to a persistent Radice/Assets cache in your user application-data folder. Original paths are no longer required. Subsequent ordinary saves refer to the cache: use EXPORT again to move them to another computer. Paths to other presets assigned to Program Changes are not recursively embedded; transfer those presets separately and reassign them if needed.
 
 To preserve a sound, keep assets in a stable folder, save the preset and note which files it uses. To transfer an ordinary preset, copy and reload its assets too; alternatively use EXPORT to create a single portable file.
 
@@ -149,16 +151,16 @@ Drag-and-drop:
 • A file dropped on a slot row (PEDAL, AMP, CAB, ROOM) loads into that slot; elsewhere a .nam loads AMP.
 • Resize the window from its corner: the interface scales and keeps its proportions (50 % to 200 %). It fits the screen the first time and then remembers the last size.
 • Dropping an IR in the upper area loads CAB; the lower effects row loads ROOM.
-• Dropping a .lowline opens that preset.
+• Dropping a .radice opens that preset.
 
 The four factory configurations are starting points: Clean foundation, Warm edge, Wide ambience and Direct / DI. They do not load assets, and retain input selection and INPUT/OUTPUT calibration. Direct / DI uses the clean branch but retains compression; Wide ambience needs an IR for its reverb. Recalling a configuration can overwrite sound settings: save your work first.
 
 ## 10 · MIDI and foot controllers
-In the standalone app enable your controller in Audio/MIDI settings. For the plugin, route MIDI to Lowline in your DAW; the procedure depends on the host. Lowline accepts all MIDI channels.
+In the standalone app enable your controller in Audio/MIDI settings. For the plugin, route MIDI to Radice in your DAW; the procedure depends on the host. Radice accepts all MIDI channels.
 
-Program Change 0…3 recalls the four factory presets in order. Some controllers display these as 1…4: check the actual transmitted message. In MIDI you can assign a .lowline file to any PC 0…127: choose the number, click ASSIGN PRESET and select the file. CLEAR PC removes an assignment. User assignments override factory presets; unassigned numbers above 3 are ignored. Files load on the worker, including the time needed to read and prepare assets.
+Program Change 0…3 recalls the four factory presets in order. Some controllers display these as 1…4: check the actual transmitted message. In MIDI you can assign a .radice file to any PC 0…127: choose the number, click ASSIGN PRESET and select the file. CLEAR PC removes an assignment. User assignments override factory presets; unassigned numbers above 3 are ignored. Files load on the worker, including the time needed to read and prepare assets.
 
-The MIDI map, footswitch mode and PC bank are global: every change is saved automatically to one file (Lowline/midi-controller.xml in the user data folder) shared by the app and every plugin instance. Opening a preset, even one from someone else, never changes them. On first use of 0.3.2 the map stored in your last preset or session is adopted once as the starting point.
+The MIDI map, footswitch mode and PC bank are global: every change is saved automatically to one file (Radice/midi-controller.xml in the user data folder) shared by the app and every plugin instance. Opening a preset, even one from someone else, never changes them. On first use of 0.3.2 the map stored in your last preset or session is adopted once as the starting point.
 
 Control Change (CC):
 20 = compressor
@@ -178,17 +180,17 @@ MIDI LEARN: choose a parameter, click LEARN and move the controller. The next re
 
 Continuous controls use the parameter's full range across values 0…127, so learned OUTPUT reaches +12 dB while default CC 7 keeps its original +6 dB ceiling. Buttons use 0…63 off and 64…127 on. Tap tempo triggers on a transition from low to high: the controller must also transmit release.
 
-An expression pedal can control blend, output or other parameters. Calibrate its range on the controller: Lowline does not yet offer min/max calibration or custom curves. Assignments accept every channel; messages apply at audio-block boundaries rather than sample-accurately.
+An expression pedal can control blend, output or other parameters. Calibrate its range on the controller: Radice does not yet offer min/max calibration or custom curves. Assignments accept every channel; messages apply at audio-block boundaries rather than sample-accurately.
 
 ## 11 · Plugin use on Mac, Windows and Linux
 Standalone is the independent app. VST3 is the plugin format for a compatible host; AU is the Mac format used by hosts such as GarageBand and Logic. Install only the formats you need.
 
 On Mac the usual user folders are:
-~/Library/Audio/Plug-Ins/Components/ for Lowline.component (AU)
-~/Library/Audio/Plug-Ins/VST3/ for Lowline.vst3
+~/Library/Audio/Plug-Ins/Components/ for Radice.component (AU)
+~/Library/Audio/Plug-Ins/VST3/ for Radice.vst3
 Library is inside your Home folder; in Finder use Go → Go to Folder to reach it.
 
-After copying the bundle, restart the host or rescan plugins. Insert Lowline on a bass audio track, choose the correct Scarlett input and enable track monitoring. When using the plugin, set audio device and buffer in the DAW. Avoid monitoring through the standalone app, direct monitoring and DAW simultaneously.
+After copying the bundle, restart the host or rescan plugins. Insert Radice on a bass audio track, choose the correct Scarlett input and enable track monitoring. When using the plugin, set audio device and buffer in the DAW. Avoid monitoring through the standalone app, direct monitoring and DAW simultaneously.
 
 For ping-pong and stereo IRs use a stereo output. Mono output folds the channels together and loses stereo width.
 
@@ -214,13 +216,13 @@ Current limits: NAM normalisation requires valid loudness metadata; input and ex
 Automated builds check software using synthetic signals and test models. Latency, drop-outs, accuracy on real basses and listening results need verification with your Scarlett and host. Start with a 256-sample buffer and low volume; try 128 if the system remains stable.
 
 ## 13 · Library, favourites and presets
-Open WORKSPACE → LIBRARY. ADD FILES indexes NAM captures, IRs and .lowline presets; SCAN FOLDER searches subfolders in the background without following symlinks, up to 10,000 files per scan. Files remain at their original paths. A red [MISSING] entry means a path is unavailable: remove the entry and add its new location. Removing an entry never deletes the actual file.
+Open WORKSPACE → LIBRARY. ADD FILES indexes NAM captures, IRs and .radice presets; SCAN FOLDER searches subfolders in the background without following symlinks, up to 10,000 files per scan. Files remain at their original paths. A red [MISSING] entry means a path is unavailable: remove the entry and add its new location. Removing an entry never deletes the actual file.
 
 Select NAM, IR or Preset and search by filename, path or tags. FAVOURITE +/- changes the star, Favourites only filters the list and Sort by recent prioritises last-loaded entries. Double-click or LOAD opens the selection; arrows follow the current filtered order. Pedal/Amp/Cab/Room chooses the destination; NAM always goes to a NAM slot and IR to an IR slot. SHOW FILE reveals the item in the operating system.
 
-The field beside TAG ITEM assigns local tags to the selected entry. Catalogue tags and preset tags are separate. Loading a preset imports its name and tags into the catalogue. The catalogue is stored in Lowline's user-data folder; favourites and recent history are not embedded in portable presets. Avoid editing it from multiple simultaneous instances: the latest catalogue save wins.
+The field beside TAG ITEM assigns local tags to the selected entry. Catalogue tags and preset tags are separate. Loading a preset imports its name and tags into the catalogue. The catalogue is stored in Radice's user-data folder; favourites and recent history are not embedded in portable presets. Avoid editing it from multiple simultaneous instances: the latest catalogue save wins.
 
-The right-hand fields describe the CURRENT preset, not necessarily the selected row. Enter a name, tags and description, APPLY PRESET DETAILS, then SAVE or EXPORT in the rig. These details accompany the .lowline file. UNDO/REDO covers what you do in the interface: knobs, buttons, menus, factory programs, A/B recalls and editorial metadata. Changes from MIDI, DAW automation and TAP stay out of the history; asset loading, recording and catalogue operations are not undone. Each gesture (a drag, a click) is one step. History is temporary and restarts when a preset is opened. The asterisk in STAGE indicates changes since saving/opening; practice settings and A/B match gain are temporary and excluded from that preset.
+The right-hand fields describe the CURRENT preset, not necessarily the selected row. Enter a name, tags and description, APPLY PRESET DETAILS, then SAVE or EXPORT in the rig. These details accompany the .radice file. UNDO/REDO covers what you do in the interface: knobs, buttons, menus, factory programs, A/B recalls and editorial metadata. Changes from MIDI, DAW automation and TAP stay out of the history; asset loading, recording and catalogue operations are not undone. Each gesture (a drag, a click) is one step. History is temporary and restarts when a preset is opened. The asterisk in STAGE indicates changes since saving/opening; practice settings and A/B match gain are temporary and excluded from that preset.
 
 ## 14 · A/B comparison and measured levels
 WORKSPACE → COMPARE A/B holds two temporary snapshots of controls and the four capture paths. STORE A/B replaces that snapshot; RECALL A/B restores it. Wait for asset preparation. Snapshots neither embed files nor survive closing the instance: SAVE a preset to keep a sound. These are not two complete rigs processing continuously in parallel.
@@ -241,9 +243,9 @@ The independent metronome offers 30–300 BPM, volume, 2–7 beats per measure a
 ## 16 · Quick DI + FX recording
 RECORD DI + FX asks for a name and folder, then creates name-DI.wav (mono) and name-FX.wav (stereo). Both are 32-bit floating-point WAVs at the current device/host sample rate. Float preserves values above 0 dBFS; reduce their playback level when importing into another application. Existing takes are never intentionally overwritten: choose a new name if either output file already exists.
 
-DI is the selected raw input before INPUT gain, gate, compressor and effects. FX is processed bass including A/B match gain, before the final monitor limiter and tuner mute. Backing and metronome are excluded from both files. Hardware latency is not represented; models and IRs may introduce their own delays. Import DI into a DAW and use Lowline as a plugin to change the sound afterwards.
+DI is the selected raw input before INPUT gain, gate, compressor and effects. FX is processed bass including A/B match gain, before the final monitor limiter and tuner mute. Backing and metronome are excluded from both files. Hardware latency is not represented; models and IRs may introduce their own delays. Import DI into a DAW and use Radice as a plugin to change the sound afterwards.
 
-STOP RECORDING flushes the background writer queues and finalises both files. Reconfiguring audio or closing the instance also stops recording. The dropped-block counter reports buffer loss; a non-zero count means the take may contain gaps or alignment errors. Repeat with more audio buffer headroom and an available disk. Make a short test before an important take. Host bypass does not feed these features, so do not engage it during recording; Lowline's internal BYPASS still feeds the recording path. The counter is not a guarantee against every possible disk or hardware failure.
+STOP RECORDING flushes the background writer queues and finalises both files. Reconfiguring audio or closing the instance also stops recording. The dropped-block counter reports buffer loss; a non-zero count means the take may contain gaps or alignment errors. Repeat with more audio buffer headroom and an available disk. Make a short test before an important take. Host bypass does not feed these features, so do not engage it during recording; Radice's internal BYPASS still feeds the recording path. The counter is not a guarantee against every possible disk or hardware failure.
 
 ## 17 · Stage view and sound changes
 STAGE provides a large preset name, dirty asterisk, tuner, preset arrows, TAP and bypass. Entering this page selects the Preset type in the Library; arrows follow its filtered/sorted list. Prepare favourites and search before playing. This is not yet a manually ordered setlist editor.
@@ -259,8 +261,8 @@ AUDIO / APP displays version, operating system, sample rate, prepared maximum bl
 
 The setup checklist explains input/output interface selection, bass input channel, INST and direct monitoring. Actual device settings remain in standalone Options or your DAW. One buffer's duration is NOT round-trip latency; drivers, input/output buffers and converters also contribute. A physical loopback measurement is required to establish actual latency.
 
-Mac packages are available as ZIP and DMG. README-INSTALL.txt and Install-Lowline.command are included: close the app and DAW, then run the helper to copy app and plugins into your user's folders without sudo. Existing bundles are renamed with a backup suffix. You can copy them manually instead. Each Release's notes state whether the Mac package is Developer-ID signed and notarised. If it is not, do not disable Gatekeeper: follow the package instructions and macOS Privacy & Security opening options.
+Mac packages are available as ZIP and DMG. README-INSTALL.txt and Install-Radice.command are included: close the app and DAW, then run the helper to copy app and plugins into your user's folders without sudo. Existing bundles are renamed with a backup suffix. You can copy them manually instead. Each Release's notes state whether the Mac package is Developer-ID signed and notarised. If it is not, do not disable Gatekeeper: follow the package instructions and macOS Privacy & Security opening options.
 
 CHECK FOR UPDATES opens the latest GitHub Release in your browser. Compare its version with the one shown in the app; no update is installed, downloaded or checked periodically in the background. For developers, scripts/sign-mac.sh provides an optional signing/notarisation path using a Developer ID identity and a notarytool Keychain profile you already configured. It requires an Apple Developer account and testing on a Mac; CI uses it by itself when the Apple secrets are configured in the repository.
 
-iPad and iPhone: Lowline exists as an app and as an AUv3 (AUM, GarageBand, Loopy Pro, Cubasis), in landscape. Connect your interface over USB-C or Lightning, open AUDIO to pick input and buffer, and un-mute the input (JUCE mutes it against feedback; Lowline remembers your choice - use headphones). Files picked in Files are copied into "On My iPad › Lowline" (Captures, IRs, Presets, Library, Backing folders): you can also drop them there directly and use ADD FOLDER in the library. SAVE only asks for a name and writes into Presets; recordings go to Recordings. Presets keep finding their files after app updates. BLUETOOTH MIDI (MIDI page) pairs wireless pedals. In the AUv3 the guide opens inside the interface and imported files stay in the plugin's own space.
+iPad and iPhone: Radice exists as an app and as an AUv3 (AUM, GarageBand, Loopy Pro, Cubasis), in landscape. Connect your interface over USB-C or Lightning, open AUDIO to pick input and buffer, and un-mute the input (JUCE mutes it against feedback; Radice remembers your choice - use headphones). Files picked in Files are copied into "On My iPad › Radice" (Captures, IRs, Presets, Library, Backing folders): you can also drop them there directly and use ADD FOLDER in the library. SAVE only asks for a name and writes into Presets; recordings go to Recordings. Presets keep finding their files after app updates. BLUETOOTH MIDI (MIDI page) pairs wireless pedals. In the AUv3 the guide opens inside the interface and imported files stay in the plugin's own space.

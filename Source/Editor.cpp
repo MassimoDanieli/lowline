@@ -289,7 +289,7 @@ void LowlineView::paint(Graphics &g)
     g.fillAll(bg);
     g.setColour(mint);
     g.setFont(Font(42.f, Font::bold));
-    g.drawText("lowline", 24, 10, 220, 54, Justification::centredLeft);
+    g.drawText("radice", 24, 10, 220, 54, Justification::centredLeft);
     g.setColour(gold);
     g.setFont(Font(11.f));
     g.drawText(String(JucePlugin_VersionString) + "  /  BASS WORKSPACE", 250, 31, 240, 20, Justification::centredLeft);
@@ -503,24 +503,24 @@ void LowlineView::preset(bool save, bool portable)
     {
         // iPad: presets go straight into Documents/Presets (share them from the Files app).
         lowline::platform::askName(this, proc.getLanguage() == "IT" ? "Nome del preset" : "Preset name",
-                                   proc.presetName(), "Presets", ".lowline",
+                                   proc.presetName(), "Presets", ".radice",
                                    [safe, portable](const File &f) { if (safe) safe->proc.savePreset(f, portable); });
         return;
     }
     if (!save)
     {
-        chooser = std::make_unique<FileChooser>("Open Lowline preset", File{}, lowline::platform::pickerFilter("*.lowline"));
+        chooser = std::make_unique<FileChooser>("Open Radice preset", File{}, lowline::platform::pickerFilter(lowline::platform::presetPattern()));
         chooser->launchAsync(FileBrowserComponent::openMode | FileBrowserComponent::canSelectFiles,
                              [safe](const FileChooser &c)
                              {
                                  const auto f = lowline::platform::adoptFirst(c, "Presets");
-                                 if (safe && f.existsAsFile() && f.hasFileExtension("lowline")) safe->proc.openPreset(f);
+                                 if (safe && f.existsAsFile() && lowline::platform::isPreset(f)) safe->proc.openPreset(f);
                              });
         return;
     }
     chooser = std::make_unique<FileChooser>(
-        save ? "Save Lowline preset" : "Open Lowline preset",
-        File::getSpecialLocation(File::userDocumentsDirectory).getChildFile("My bass.lowline"), "*.lowline");
+        save ? "Save Radice preset" : "Open Radice preset",
+        File::getSpecialLocation(File::userDocumentsDirectory).getChildFile("My bass.radice"), lowline::platform::presetPattern());
     chooser->launchAsync((save ? FileBrowserComponent::saveMode | FileBrowserComponent::warnAboutOverwriting
                                : FileBrowserComponent::openMode) |
                              FileBrowserComponent::canSelectFiles,
@@ -530,7 +530,7 @@ void LowlineView::preset(bool save, bool portable)
                              {
                                  auto f = c.getResult();
                                  if (save)
-                                     safe->proc.savePreset(f.withFileExtension("lowline"), portable);
+                                     safe->proc.savePreset(f.withFileExtension("radice"), portable);
                                  else
                                      safe->proc.openPreset(f);
                              }
@@ -538,14 +538,14 @@ void LowlineView::preset(bool save, bool portable)
 }
 bool LowlineView::isInterestedInFileDrag(const StringArray &files)
 {
-    return files.size() == 1 && (File(files[0]).hasFileExtension("nam;wav;aiff;aif;lowline"));
+    return files.size() == 1 && (File(files[0]).hasFileExtension("nam;wav;aiff;aif;radice;lowline"));
 }
 void LowlineView::filesDropped(const StringArray &files, int x, int y)
 {
     if (files.isEmpty())
         return;
     File f(files[0]);
-    if (f.hasFileExtension("lowline"))
+    if (lowline::platform::isPreset(f))
     {
         proc.openPreset(f);
         return;
@@ -568,14 +568,14 @@ void LowlineView::filesDropped(const StringArray &files, int x, int y)
 void LowlineView::assignMidiPreset()
 {
     const int pc = midiProgram.getSelectedId() - 1;
-    chooser = std::make_unique<FileChooser>("Assign .lowline preset to PC " + String(pc), File{},
-                                            lowline::platform::pickerFilter("*.lowline"));
+    chooser = std::make_unique<FileChooser>("Assign preset to PC " + String(pc), File{},
+                                            lowline::platform::pickerFilter(lowline::platform::presetPattern()));
     Component::SafePointer<LowlineView> safe(this);
     chooser->launchAsync(FileBrowserComponent::openMode | FileBrowserComponent::canSelectFiles,
         [safe, pc](const FileChooser &choice)
         {
             const auto f = lowline::platform::adoptFirst(choice, "Presets");
-            if (safe && f.existsAsFile() && f.hasFileExtension("lowline")) safe->proc.assignProgram(pc, f);
+            if (safe && f.existsAsFile() && lowline::platform::isPreset(f)) safe->proc.assignProgram(pc, f);
         });
 }
 

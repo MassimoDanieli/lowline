@@ -5,7 +5,7 @@ namespace
 Colour panel(0xff1c232d), green(0xff2ef2a0), amber(0xffffbf47);
 }
 LowlineWorkbench::LowlineWorkbench(LowlineProcessor &p)
-    : Thread("Lowline library scan"), proc(p), list("Library", this)
+    : Thread("Radice library scan"), proc(p), list("Library", this)
 {
     setWantsKeyboardFocus(true);
     button("library", "LIBRERIA", "LIBRARY", [this] { showPage(0); });
@@ -99,9 +99,9 @@ LowlineWorkbench::LowlineWorkbench(LowlineProcessor &p)
         v->setValueNotifyingHost(v->getValue() < .5f ? 1.f : 0.f);
     });
     button("updates", "CONTROLLA AGGIORNAMENTI", "CHECK FOR UPDATES",
-           [] { URL("https://github.com/MassimoDanieli/lowline/releases/latest").launchInDefaultBrowser(); });
+           [] { URL("https://github.com/MassimoDanieli/radice/releases/latest").launchInDefaultBrowser(); });
     button("guide", "GUIDA CONFIGURAZIONE", "SETUP GUIDE", [this] {
-        URL(String("https://github.com/MassimoDanieli/lowline/blob/main/docs/HELP_") + (it() ? "IT" : "EN") +
+        URL(String("https://github.com/MassimoDanieli/radice/blob/main/docs/HELP_") + (it() ? "IT" : "EN") +
             ".md")
             .launchInDefaultBrowser();
     });
@@ -185,7 +185,7 @@ LowlineWorkbench::~LowlineWorkbench()
 }
 File LowlineWorkbench::catalog() const
 {
-    return File::getSpecialLocation(File::userApplicationDataDirectory).getChildFile("Lowline/library.xml");
+    return lowline::platform::appData().getChildFile("library.xml");
 }
 void LowlineWorkbench::button(const char *id, const char *italian, const char *english,
                               std::function<void()> f)
@@ -390,7 +390,7 @@ void LowlineWorkbench::refresh()
         File f(e.path);
         const bool type = kind.getSelectedId() == 1   ? f.hasFileExtension("nam")
                           : kind.getSelectedId() == 2 ? f.hasFileExtension("wav;aiff;aif")
-                                                      : f.hasFileExtension("lowline");
+                                                      : lowline::platform::isPreset(f);
         if (type && (!favourites.getToggleState() || e.favourite) &&
             (q.isEmpty() || (e.path + " " + e.tags + " " + e.title).containsIgnoreCase(q)))
             visible.push_back(i);
@@ -447,7 +447,7 @@ void LowlineWorkbench::activate(int direction)
     if (!f.existsAsFile())
         return;
     e.path = f.getFullPathName();
-    if (f.hasFileExtension("lowline"))
+    if (lowline::platform::isPreset(f))
     {
         proc.openPreset(f);
         e.tags = proc.presetTags();
@@ -469,7 +469,7 @@ void LowlineWorkbench::addFiles(const Array<File> &files)
 {
     for (auto &f : files)
     {
-        if (!f.hasFileExtension("nam;wav;aiff;aif;lowline"))
+        if (!f.hasFileExtension("nam;wav;aiff;aif;radice;lowline"))
             continue;
         const auto path = f.getFullPathName();
         if (std::none_of(items.begin(), items.end(), [&](auto &e) { return e.path == path; }))
@@ -501,7 +501,7 @@ void LowlineWorkbench::chooseFiles(bool folder)
 {
     if (folder && lowline::platform::sandboxed())
     {
-        // iPad: the library folder is Lowline's own Documents ("On My iPad > Lowline" in Files).
+        // iPad: the library folder is Radice's own Documents ("On My iPad > Radice" in Files).
         {
             std::lock_guard l(scanLock);
             scanFolder = lowline::platform::documents();
@@ -512,7 +512,7 @@ void LowlineWorkbench::chooseFiles(bool folder)
         return;
     }
     chooser = std::make_unique<FileChooser>(it() ? "Aggiungi alla libreria" : "Add to library", File{},
-                                            lowline::platform::pickerFilter("*.nam;*.wav;*.aif;*.aiff;*.lowline"));
+                                            lowline::platform::pickerFilter("*.nam;*.wav;*.aif;*.aiff;" + lowline::platform::presetPattern()));
     Component::SafePointer<LowlineWorkbench> safe(this);
     chooser->launchAsync(
         FileBrowserComponent::openMode |
@@ -558,7 +558,7 @@ void LowlineWorkbench::run()
             if (threadShouldExit())
                 return;
             auto f = entry.getFile();
-            if (f.hasFileExtension("nam;wav;aif;aiff;lowline"))
+            if (f.hasFileExtension("nam;wav;aif;aiff;radice;lowline"))
                 result.push_back(f);
             if (result.size() >= 10000)
                 break;
@@ -592,11 +592,11 @@ void LowlineWorkbench::record()
     {
         // iPad: takes go to Documents/Recordings, no dialog (a save picker cannot stream a long take).
         proc.studio.startRecording(lowline::platform::folder("Recordings")
-            .getChildFile("Lowline-" + Time::getCurrentTime().formatted("%Y%m%d-%H%M%S") + ".wav"));
+            .getChildFile("Radice-" + Time::getCurrentTime().formatted("%Y%m%d-%H%M%S") + ".wav"));
         return;
     }
     auto f = File::getSpecialLocation(File::userDocumentsDirectory)
-                 .getChildFile("Lowline-" + Time::getCurrentTime().formatted("%Y%m%d-%H%M%S") + ".wav");
+                 .getChildFile("Radice-" + Time::getCurrentTime().formatted("%Y%m%d-%H%M%S") + ".wav");
     chooser = std::make_unique<FileChooser>(
         it() ? "Scegli nome e cartella della registrazione" : "Choose recording name and folder", f, "*.wav");
     Component::SafePointer<LowlineWorkbench> safe(this);
@@ -713,7 +713,7 @@ void LowlineWorkbench::timerCallback()
     }
     if (page == 4)
     {
-        title = "Lowline 0.3.0 / " + SystemStats::getOperatingSystemName();
+        title = "Radice " + String(JucePlugin_VersionString) + " / " + SystemStats::getOperatingSystemName();
         diagnostic.setText("Audio: " + String(proc.audioRate(), 0) + " Hz / " + String(proc.audioBlock()) +
                                " samples\n" + (it() ? "Durata di un buffer: " : "One buffer duration: ") +
                                String(1000 * proc.audioBlock() / proc.audioRate(), 2) + " ms\n" +

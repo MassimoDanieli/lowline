@@ -3,8 +3,8 @@
 
 // iPad / iPhone files. An iOS app lives in a sandbox: a file picked in the Files app is only
 // borrowed (security-scoped URL) and the app's own container path changes on every update.
-// So on iOS Lowline copies what you pick into its Documents folder (visible in Files as
-// "On My iPad > Lowline"), saves presets and recordings there directly, and re-roots stored
+// So on iOS Radice copies what you pick into its Documents folder (visible in Files as
+// "On My iPad > Radice"), saves presets and recordings there directly, and re-roots stored
 // paths that point into an older container. On the desktop everything stays as it was.
 namespace lowline::platform
 {
@@ -26,13 +26,32 @@ inline juce::File &documentsForTests()
     static juce::File folder;
     return folder;
 }
-// The app's Documents folder on iOS (root of "On My iPad > Lowline").
+// The app's Documents folder on iOS (root of "On My iPad > Radice").
 inline juce::File documents()
 {
     if (documentsForTests() != juce::File{})
         return documentsForTests();
     return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
 }
+// Settings, library and portable-asset cache. The app was called Lowline until 0.4: its small
+// settings files are copied (never moved) on first use, so an older build keeps working and
+// sessions that point into the old asset cache still find their files there.
+inline juce::File appData(const juce::File &base = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory))
+{
+    auto now = base.getChildFile("Radice");
+    if (!now.isDirectory())
+    {
+        now.createDirectory();
+        const auto old = base.getChildFile("Lowline");
+        for (const char *name : {"midi-controller.xml", "library.xml"})
+            if (old.getChildFile(name).existsAsFile())
+                old.getChildFile(name).copyFileTo(now.getChildFile(name));
+    }
+    return now;
+}
+// Preset files are .radice; presets saved as .lowline by earlier versions still open.
+inline bool isPreset(const juce::File &f) { return f.hasFileExtension("radice;lowline"); }
+inline juce::String presetPattern() { return "*.radice;*.lowline"; }
 inline juce::File folder(const juce::String &name)
 {
     auto f = documents().getChildFile(name);

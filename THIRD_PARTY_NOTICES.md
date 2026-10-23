@@ -1,6 +1,6 @@
 # Third-party notices
 
-Lowline's original code is AGPL-3.0-only. Copyright 2026 Massimo Danieli.
+Radice's original code is AGPL-3.0-only. Copyright 2026 Massimo Danieli.
 
 The complete source ZIP contains these dependencies; repository builds fetch them at the pinned revisions:
 

@@ -58,13 +58,13 @@ jobs:
             Windows) run="pluginval/pluginval.exe" ;;
           esac
           $run --strictness-level 10 --validate-in-process --output-dir pluginval-logs \
-            --validate "build/Lowline_artefacts/Release/VST3/Lowline.vst3"
+            --validate "build/Lowline_artefacts/Release/VST3/Radice.vst3"
       - name: Validate AU (auval)
         if: runner.os == 'macOS'
         run: |
           set -euo pipefail
           mkdir -p ~/Library/Audio/Plug-Ins/Components
-          cp -R build/Lowline_artefacts/Release/AU/Lowline.component ~/Library/Audio/Plug-Ins/Components/
+          cp -R build/Lowline_artefacts/Release/AU/Radice.component ~/Library/Audio/Plug-Ins/Components/
           killall -9 AudioComponentRegistrar 2>/dev/null || true
           sleep 3
           triple=$(auval -a | awk '/MsDn/ && /LwLn/ {print $1" "$2" "$3; exit}')
@@ -78,7 +78,7 @@ jobs:
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
-          name: Lowline-interface-preview
+          name: Radice-interface-preview
           if-no-files-found: error
           retention-days: 30
           path: |
@@ -90,12 +90,12 @@ jobs:
       - name: Verify Mac architectures and assemble package
         if: runner.os == 'macOS'
         run: |
-          lipo build/Lowline_artefacts/Release/Standalone/Lowline.app/Contents/MacOS/Lowline -archs
-          lipo build/Lowline_artefacts/Release/Standalone/Lowline.app/Contents/MacOS/Lowline -verify_arch arm64 x86_64
-          mkdir -p package/Lowline
-          cp -R build/Lowline_artefacts/Release/Standalone build/Lowline_artefacts/Release/VST3 build/Lowline_artefacts/Release/AU package/Lowline/
-          cp packaging/Install-Lowline.command packaging/README-INSTALL.txt package/Lowline/
-          chmod +x package/Lowline/Install-Lowline.command
+          lipo build/Lowline_artefacts/Release/Standalone/Radice.app/Contents/MacOS/Radice -archs
+          lipo build/Lowline_artefacts/Release/Standalone/Radice.app/Contents/MacOS/Radice -verify_arch arm64 x86_64
+          mkdir -p package/Radice
+          cp -R build/Lowline_artefacts/Release/Standalone build/Lowline_artefacts/Release/VST3 build/Lowline_artefacts/Release/AU package/Radice/
+          cp packaging/Install-Radice.command packaging/README-INSTALL.txt package/Radice/
+          chmod +x package/Radice/Install-Radice.command
       - name: Sign and notarise Mac bundles (Developer ID)
         if: runner.os == 'macOS' && env.MAC_SIGNING == 'true'
         env:
@@ -124,20 +124,20 @@ jobs:
           echo "LOWLINE_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
           echo "LOWLINE_NOTARY_PROFILE=lowline-ci" >> "$GITHUB_ENV"
           LOWLINE_SIGN_IDENTITY="$identity" LOWLINE_NOTARY_PROFILE=lowline-ci LOWLINE_KEYCHAIN="$keychain" \
-            scripts/sign-mac.sh package/Lowline
+            scripts/sign-mac.sh package/Radice
       - name: Create Mac archives
         if: runner.os == 'macOS'
         run: |
           set -euo pipefail
           version=$(sed -nE 's/^project\(Lowline VERSION ([0-9.]+).*/\1/p' CMakeLists.txt)
-          ditto -c -k --sequesterRsrc --keepParent package/Lowline Lowline-macOS-universal.zip
-          hdiutil create -volname "Lowline $version" -srcfolder package/Lowline -ov -format UDZO Lowline-macOS-universal.dmg
+          ditto -c -k --sequesterRsrc --keepParent package/Radice Radice-macOS-universal.zip
+          hdiutil create -volname "Radice $version" -srcfolder package/Radice -ov -format UDZO Radice-macOS-universal.dmg
           if [[ "$MAC_SIGNING" == true ]]; then
-            codesign --force --timestamp --sign "$LOWLINE_SIGN_IDENTITY" Lowline-macOS-universal.dmg
-            xcrun notarytool submit Lowline-macOS-universal.dmg --keychain-profile "$LOWLINE_NOTARY_PROFILE" \
+            codesign --force --timestamp --sign "$LOWLINE_SIGN_IDENTITY" Radice-macOS-universal.dmg
+            xcrun notarytool submit Radice-macOS-universal.dmg --keychain-profile "$LOWLINE_NOTARY_PROFILE" \
               --keychain "$LOWLINE_KEYCHAIN" --wait
-            xcrun stapler staple Lowline-macOS-universal.dmg
-            spctl --assess --type open --context context:primary-signature -vv Lowline-macOS-universal.dmg
+            xcrun stapler staple Radice-macOS-universal.dmg
+            spctl --assess --type open --context context:primary-signature -vv Radice-macOS-universal.dmg
           fi
       - name: Remove signing keychain
         if: always() && runner.os == 'macOS' && env.MAC_SIGNING == 'true'
@@ -145,23 +145,23 @@ jobs:
       - name: Package Windows
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Compress-Archive -Path build/Lowline_artefacts/Release/Standalone,build/Lowline_artefacts/Release/VST3,packaging/README-INSTALL.txt -DestinationPath Lowline-Windows-x64.zip
+        run: Compress-Archive -Path build/Lowline_artefacts/Release/Standalone,build/Lowline_artefacts/Release/VST3,packaging/README-INSTALL.txt -DestinationPath Radice-Windows-x64.zip
       - name: Package Linux
         if: runner.os == 'Linux'
         run: |
           cp packaging/README-INSTALL.txt build/Lowline_artefacts/Release/
-          tar -C build/Lowline_artefacts/Release -czf Lowline-Linux-x64.tar.gz Standalone VST3 README-INSTALL.txt
+          tar -C build/Lowline_artefacts/Release -czf Radice-Linux-x64.tar.gz Standalone VST3 README-INSTALL.txt
       - name: Upload downloadable build
         uses: actions/upload-artifact@v4
         with:
-          name: Lowline-${{ matrix.platform }}
+          name: Radice-${{ matrix.platform }}
           if-no-files-found: error
           retention-days: 30
           path: |
-            Lowline-macOS-universal.zip
-            Lowline-macOS-universal.dmg
-            Lowline-Windows-x64.zip
-            Lowline-Linux-x64.tar.gz
+            Radice-macOS-universal.zip
+            Radice-macOS-universal.dmg
+            Radice-Windows-x64.zip
+            Radice-Linux-x64.tar.gz
       - name: Upload test logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -189,16 +189,16 @@ jobs:
         run: |
           set -euo pipefail
           # JUCE writes products to Lowline_artefacts/<config>/Standalone (no "-iphoneos" suffix).
-          app=$(find build-ios -name 'Lowline.app' -type d -not -path '*.build/*' -print -quit)
+          app=$(find build-ios -name 'Radice.app' -type d -not -path '*.build/*' -print -quit)
           if [[ -z "$app" ]]; then
-            echo 'Lowline.app not found; bundles produced:'
+            echo 'Radice.app not found; bundles produced:'
             find build-ios \( -name '*.app' -o -name '*.appex' \) -type d -not -path '*.build/*'
             exit 1
           fi
           echo "App: $app"
           ls "$app/PlugIns" || echo 'Warning: no embedded AUv3 found in PlugIns'
           /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Info.plist"
-          lipo -info "$app/Lowline"
+          lipo -info "$app/Radice"
 
   release:
     name: Publish downloads for the CMake version
@@ -215,7 +215,7 @@ jobs:
           path: source
       - uses: actions/download-artifact@v4
         with:
-          pattern: Lowline-*
+          pattern: Radice-*
           merge-multiple: true
           path: packages
       - name: Publish tested packages
@@ -241,10 +241,10 @@ jobs:
           # in CMakeLists.txt during development does not ship with the previous version's docs.
           STALE=""
           V="${VERSION//./\\.}" # dots are literal in the patterns below
-          head -n 1 source/README.md | grep -q "^# Lowline $V\b" || STALE="$STALE README.md"
-          head -n 1 source/LEGGIMI.md | grep -q "^# Lowline $V\b" || STALE="$STALE LEGGIMI.md"
-          head -n 1 source/VALIDATION.md | grep -q "Lowline $V\b" || STALE="$STALE VALIDATION.md"
-          grep -qE "^# (Lowline )?$VERSION([^0-9.]|$)" source/CHANGELOG.md || STALE="$STALE CHANGELOG.md"
+          head -n 1 source/README.md | grep -q "^# Radice $V\b" || STALE="$STALE README.md"
+          head -n 1 source/LEGGIMI.md | grep -q "^# Radice $V\b" || STALE="$STALE LEGGIMI.md"
+          head -n 1 source/VALIDATION.md | grep -q "Radice $V\b" || STALE="$STALE VALIDATION.md"
+          grep -qE "^# ((Lowline|Radice) )?$VERSION([^0-9.]|$)" source/CHANGELOG.md || STALE="$STALE CHANGELOG.md"
           if [[ -n "$STALE" ]]; then
             echo "::warning::Not publishing $TAG: these files do not describe version $VERSION yet:$STALE"
             echo "Release $TAG not published: update$STALE to $VERSION first." >> "$GITHUB_STEP_SUMMARY"
@@ -252,12 +252,12 @@ jobs:
           fi
           # Release notes: the CHANGELOG section of this version (from its heading to the next one).
           CHANGES=$(awk -v v="$VERSION" '
-            /^# / { if (found) exit; if ($0 ~ "^# (Lowline )?" v "([^0-9.]|$)") { found = 1; next } }
+            /^# / { if (found) exit; if ($0 ~ "^# ((Lowline|Radice) )?" v "([^0-9.]|$)") { found = 1; next } }
             found { print }' source/CHANGELOG.md)
           cd packages
-          sha256sum Lowline-macOS-universal.zip Lowline-macOS-universal.dmg Lowline-Windows-x64.zip Lowline-Linux-x64.tar.gz > SHA256SUMS.txt
+          sha256sum Radice-macOS-universal.zip Radice-macOS-universal.dmg Radice-Windows-x64.zip Radice-Linux-x64.tar.gz > SHA256SUMS.txt
           {
-            echo "## Lowline $VERSION"
+            echo "## Radice $VERSION"
             echo '**Scarica / Download:** choose your system under **Assets**, not Source code.'
             if [[ "$MAC_SIGNING" == true ]]; then
               echo '- macOS universal: DMG or ZIP, Apple Silicon + Intel, standalone / AU / VST3. Developer-ID signed and notarised by Apple.'
@@ -271,10 +271,10 @@ jobs:
             echo
             echo 'Every build passes the regression tests, pluginval (strictness 10) on all three systems and auval on macOS.'
             echo
-            echo '[Guida italiana](https://github.com/MassimoDanieli/lowline/blob/main/docs/HELP_IT.md) · [English guide](https://github.com/MassimoDanieli/lowline/blob/main/docs/HELP_EN.md) · [Validation and limits](https://github.com/MassimoDanieli/lowline/blob/main/VALIDATION.md)'
+            echo '[Guida italiana](https://github.com/MassimoDanieli/radice/blob/main/docs/HELP_IT.md) · [English guide](https://github.com/MassimoDanieli/radice/blob/main/docs/HELP_EN.md) · [Validation and limits](https://github.com/MassimoDanieli/radice/blob/main/VALIDATION.md)'
             echo
             echo 'All three native build/test jobs must succeed before this release is published. Hardware listening and actual interface latency are not certified by these tests. No NAM captures or IRs are bundled.'
           } > notes.md
-          gh release create "$TAG" --target "$SOURCE_SHA" --title "Lowline $VERSION" --notes-file notes.md --draft
-          gh release upload "$TAG" Lowline-macOS-universal.zip Lowline-macOS-universal.dmg Lowline-Windows-x64.zip Lowline-Linux-x64.tar.gz SHA256SUMS.txt
+          gh release create "$TAG" --target "$SOURCE_SHA" --title "Radice $VERSION" --notes-file notes.md --draft
+          gh release upload "$TAG" Radice-macOS-universal.zip Radice-macOS-universal.dmg Radice-Windows-x64.zip Radice-Linux-x64.tar.gz SHA256SUMS.txt
           gh release edit "$TAG" --draft=false --latest

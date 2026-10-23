@@ -1,9 +1,12 @@
 /build/
 .DS_Store
 *.lowline
+*.radice
 /third_party/
 /Lowline-*.zip
+/Radice-*.zip
 /Lowline-*.tar.gz
+/Radice-*.tar.gz
 /test-results.txt
 /ctest-results.txt
 /changes-*.patch

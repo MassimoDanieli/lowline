@@ -7,7 +7,7 @@
 class LowlineStudio : private juce::Thread
 {
   public:
-    LowlineStudio() : Thread("Lowline backing preparation"), disk("Lowline recording")
+    LowlineStudio() : Thread("Radice backing preparation"), disk("Radice recording")
     {
         formats.registerBasicFormats();
         disk.startThread();
