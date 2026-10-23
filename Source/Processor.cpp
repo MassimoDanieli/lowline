@@ -400,6 +400,7 @@ void LowlineProcessor::processBlock(AudioBuffer<float> &buffer, MidiBuffer &m)
 void LowlineProcessor::processBlockBypassed(AudioBuffer<float> &buffer, MidiBuffer &messages)
 {
     ScopedNoDenormals guard;
+    midi(messages); // footswitches and Program Changes still work while the host bypasses Lowline
     messages.clear();
     if (getTotalNumOutputChannels() == 1 && getTotalNumInputChannels() > 1)
         for (int i = 0; i < buffer.getNumSamples(); ++i)
@@ -632,13 +633,28 @@ void LowlineProcessor::workerLoop()
                 for (int i = 0; i < 4; ++i)
                     if (!job.keep[size_t(i)]) prepared[size_t(i)] = prepareCapture(Slot(i), job.files[size_t(i)], sr, bs);
                 const SpinLock::ScopedLockType setup(modelLock);
-                if (rate != sr || maxBlock != bs) throw std::runtime_error("Audio setup changed; recall preset again.");
-                const SpinLock::ScopedLockType publish(publicationLock);
-                for (int i = 0; i < 4; ++i)
-                    if (!job.keep[size_t(i)]) publishCapture(Slot(i), job.files[size_t(i)], std::move(prepared[size_t(i)]));
+                if (rate != sr || maxBlock != bs) throw SetupChanged("Audio setup changed; recall preset again.");
+                {
+                    const SpinLock::ScopedLockType publish(publicationLock);
+                    for (int i = 0; i < 4; ++i)
+                        if (!job.keep[size_t(i)]) publishCapture(Slot(i), job.files[size_t(i)], std::move(prepared[size_t(i)]));
+                }
+                { std::lock_guard g(metadataMutex); sessionPaths = job.wanted; }
                 if (job.warning.isNotEmpty()) throw std::runtime_error(job.warning.toStdString());
             }
             else performLoad(job.slot, job.file);
+        }
+        catch (const SetupChanged &e)
+        {
+            // Hosts often restore a session and then call prepareToPlay with their own sample rate or
+            // block size. Prepare the same files again instead of opening the session silent.
+            if (++job.attempts < 4)
+            {
+                { std::lock_guard g(jobsMutex); jobs.push_front(std::move(job)); busy = true; }
+                continue;
+            }
+            batchError = "Load failed: " + String(e.what());
+            setStatus(batchError);
         }
         catch (const std::exception &e)
         {
@@ -701,9 +717,13 @@ void LowlineProcessor::performLoad(Slot slot, const File &file)
     const double sr = rate; const int bs = maxBlock;
     auto capture = prepareCapture(slot,file,sr,bs);
     const SpinLock::ScopedLockType guard(modelLock);
-    if (rate != sr || maxBlock != bs) throw std::runtime_error("Audio setup changed; reload the file.");
-    const SpinLock::ScopedLockType publish(publicationLock);
-    publishCapture(slot,file,std::move(capture));
+    if (rate != sr || maxBlock != bs) throw SetupChanged("Audio setup changed; reload the file.");
+    {
+        const SpinLock::ScopedLockType publish(publicationLock);
+        publishCapture(slot,file,std::move(capture));
+    }
+    std::lock_guard g(metadataMutex);
+    sessionPaths[slot] = paths[slot]; // an explicit load or clear replaces what the session asked for
 }
 void LowlineProcessor::publishCapture(Slot slot, const File &file, std::unique_ptr<LowlineCapture> capture)
 {
@@ -740,9 +760,9 @@ void LowlineProcessor::setCurrentProgram(int i)
     }
     else
     {
-        // MIDI Program Change on the audio thread: never touch the ValueTree here.
-        applyProgram(i);
-        programNamePending = i;
+        // MIDI Program Change on the audio thread: applying ~30 parameters here would notify the
+        // host and the editor from the audio callback. Apply it on the message thread instead.
+        factoryProgramPending = i;
         triggerAsyncUpdate();
     }
 }
@@ -788,7 +808,7 @@ void LowlineProcessor::getStateInformation(MemoryBlock &dest)
     {
         std::lock_guard g(metadataMutex);
         for (int i = 0; i < 4; ++i)
-            tree.setProperty("file" + String(i), paths[i], nullptr);
+            tree.setProperty("file" + String(i), sessionPaths[i], nullptr);
     }
     // MIDI map and Program Change bank are global (see loadMidiSettings), not part of a sound.
     tree.removeChild(tree.getChildWithName("MidiMappings"), nullptr);
@@ -842,16 +862,22 @@ void LowlineProcessor::restoreState(const void *data, int size, bool keepUndo)
     }
     setLanguage(tree.getProperty("language", "IT").toString());
     program = jlimit(0, 3, int(tree.getProperty("program", 0)));
+    Job scene; scene.slot = Pedal; scene.scene = true;
+    for (int i = 0; i < 4; ++i)
+    {
+        const auto stored = tree.getProperty("file" + String(i)).toString();
+        // iOS: the app container moves on every update.
+        const auto path = stored.isNotEmpty() ? lowline::platform::relocate(File(stored)).getFullPathName() : String();
+        const bool found = path.isNotEmpty() && File(path).existsAsFile();
+        scene.files[size_t(i)] = found ? File(path) : File{};
+        // A missing file keeps its original path in saved state: the session still works on the
+        // machine that has it, instead of being emptied by the next save here.
+        scene.wanted[size_t(i)] = found ? path : stored;
+        if (stored.isNotEmpty() && !found) scene.warning += "File not found: " + File(stored).getFileName() + "; ";
+    }
+    { std::lock_guard g(metadataMutex); sessionPaths = scene.wanted; }
     {
         std::lock_guard guard(jobsMutex);
-        Job scene; scene.slot = Pedal; scene.scene = true;
-        for (int i = 0; i < 4; ++i)
-        {
-            auto path = tree.getProperty("file" + String(i)).toString();
-            if (path.isNotEmpty()) path = lowline::platform::relocate(File(path)).getFullPathName(); // iOS container moved
-            scene.files[size_t(i)] = path.isNotEmpty() && File(path).existsAsFile() ? File(path) : File{};
-            if (path.isNotEmpty() && !File(path).existsAsFile()) scene.warning += "File not found: " + File(path).getFileName() + "; ";
-        }
         jobs.push_back(std::move(scene));
         busy = true;
     }
@@ -876,8 +902,10 @@ void LowlineProcessor::savePreset(const File &f, bool portable)
             const String path = tree.getProperty("file" + String(slot)).toString();
             if (path.isEmpty()) continue;
             File asset(path);
+            if (!asset.existsAsFile())
+            { setStatus("Portable save failed: " + asset.getFileName() + " is missing. Load it again or clear the slot."); return; }
             const auto size = asset.getSize(); total += size;
-            if (!asset.existsAsFile() || size <= 0 || size > 64 * 1024 * 1024 || total > 192 * 1024 * 1024)
+            if (size <= 0 || size > 64 * 1024 * 1024 || total > 192 * 1024 * 1024)
             { setStatus("Portable save failed: missing or oversized asset (64 MB/file, 192 MB total)."); return; }
             MemoryBlock bytes;
             if (!asset.loadFileAsData(bytes)) { setStatus("Cannot read asset for portable preset."); return; }
@@ -950,8 +978,12 @@ void LowlineProcessor::handleAsyncUpdate()
 {
     if (clearUndoPending.exchange(false)) undo.clearUndoHistory();
     if (midiSettingsDirty) saveMidiSettings();
-    if (const int named = programNamePending.exchange(-1); named >= 0)
-        state.state.setProperty("presetName", getProgramName(named), nullptr);
+    if (const int factory = factoryProgramPending.exchange(-1); factory >= 0)
+    {
+        // Applied here, not on the audio thread. Like all MIDI, it is not an undo step.
+        applyProgram(factory);
+        state.state.setProperty("presetName", getProgramName(factory), nullptr);
+    }
     MemoryBlock bytes;
     { std::lock_guard g(presetMutex); bytes.swapWith(pendingPreset); }
     if (bytes.getSize() == 0) return;
