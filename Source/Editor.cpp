@@ -8,6 +8,38 @@ namespace
 Colour bg(0xff11151b), card(0xff1c232d), mint(0xff2ef2a0), gold(0xffffbf47), text(0xfff3f6fa),
     muted(0xffacbacb);
 }
+LowlineAudioOverlay::LowlineAudioOverlay(AudioDeviceManager &devices, Value &muteInput, bool italian)
+    // Up to two inputs (Radice picks one with Input 1 / 2) and two outputs, plus MIDI inputs for pedals.
+    : selector(devices, 0, 2, 0, 2, true, false, false, false)
+{
+    addAndMakeVisible(title);
+    title.setFont(Font(FontOptions(22.f, Font::bold)));
+    title.setColour(Label::textColourId, mint);
+    addAndMakeVisible(selector);
+    addAndMakeVisible(mute);
+    mute.getToggleStateValue().referTo(muteInput);
+    addAndMakeVisible(close);
+    close.setComponentID("ios-audio-close");
+    close.onClick = [this] { setVisible(false); };
+    setLanguage(italian);
+}
+void LowlineAudioOverlay::setLanguage(bool italian)
+{
+    title.setText(italian ? "Audio e MIDI" : "Audio and MIDI", dontSendNotification);
+    mute.setButtonText(italian ? "Silenzia l'ingresso (evita il feedback con il microfono dell'iPad)"
+                               : "Mute input (avoids feedback with the iPad microphone)");
+}
+void LowlineAudioOverlay::paint(Graphics &g) { g.fillAll(Colour(0xf011151b)); }
+void LowlineAudioOverlay::resized()
+{
+    auto area = getLocalBounds().reduced(40, 30);
+    auto top = area.removeFromTop(40);
+    close.setBounds(top.removeFromRight(120));
+    title.setBounds(top);
+    area.removeFromTop(10);
+    mute.setBounds(area.removeFromBottom(36));
+    selector.setBounds(area);
+}
 LowlineLook::LowlineLook()
 {
     setColour(Slider::textBoxTextColourId, text);
@@ -212,10 +244,22 @@ LowlineView::LowlineView(LowlineProcessor &p) : proc(p)
     {
         addAndMakeVisible(audioButton);
         audioButton.setComponentID("ios-audio");
-        audioButton.onClick = []
+        audioButton.onClick = [this]
         {
            #if JucePlugin_Build_Standalone
-            if (auto *holder = StandalonePluginHolder::getInstance()) holder->showAudioSettingsDialog();
+            if (auto *holder = StandalonePluginHolder::getInstance())
+            {
+                // Inside the interface: JUCE's settings dialog cannot be closed on iOS.
+                if (!audioOverlay)
+                {
+                    audioOverlay = std::make_unique<LowlineAudioOverlay>(holder->deviceManager, inputMuted,
+                                                                         proc.getLanguage() == "IT");
+                    addChildComponent(*audioOverlay);
+                }
+                audioOverlay->setBounds(getLocalBounds());
+                audioOverlay->setVisible(true);
+                audioOverlay->toFront(true);
+            }
            #endif
         };
        #if JucePlugin_Build_Standalone
@@ -272,6 +316,8 @@ void LowlineView::translate()
         helpWindow->setLanguage(it);
     if (helpOverlay)
         helpOverlay->setLanguage(it);
+    if (audioOverlay)
+        audioOverlay->setLanguage(it);
     repaint();
 }
 void LowlineView::panel(Graphics &g, Rectangle<int> r, const String &title, Colour accent)
@@ -359,6 +405,7 @@ void LowlineView::resized()
     bluetoothButton.setVisible(page == 2 && mobileStandalone() && BluetoothMidiDevicePairingDialogue::isAvailable());
     bluetoothButton.setBounds(712, 582, 220, 32);
     if (helpOverlay) helpOverlay->setBounds(getLocalBounds());
+    if (audioOverlay) audioOverlay->setBounds(getLocalBounds());
     programs.setBounds(936, 25, 220, 30);
     saveButton.setBounds(652, 70, 80, 28);
     packButton.setBounds(740, 70, 86, 28);

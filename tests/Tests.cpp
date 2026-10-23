@@ -2,6 +2,7 @@
 #include "../Source/Platform.h"
 #include "../Source/Help.h"
 #include "../Source/Workbench.h"
+#include "../Source/Editor.h"
 #include <iostream>
 #include <stdexcept>
 #include <thread>
@@ -1035,6 +1036,24 @@ int main(int argc, char **argv)
             LowlineHelpOverlay *overlay = nullptr;
             for (auto *child : view->getChildren()) if (auto *o = dynamic_cast<LowlineHelpOverlay *>(child)) overlay = o;
             require(overlay && overlay->isVisible() && overlay->getWidth() == 1180, "AUv3: the guide opens inside the interface");
+        {
+            // iPad: audio settings open inside the interface and can be closed again.
+            AudioDeviceManager devices;
+            Value muted(true);
+            LowlineAudioOverlay audio(devices, muted, true);
+            audio.setBounds(0, 0, 1180, 830);
+            audio.setVisible(true);
+            auto *muteToggle = [&]() -> ToggleButton * {
+                for (auto *child : audio.getChildren())
+                    if (auto *t = dynamic_cast<ToggleButton *>(child)) return t;
+                return nullptr;
+            }();
+            require(muteToggle != nullptr && muteToggle->getToggleState(), "iPad audio panel shows the input mute state");
+            muteToggle->setToggleState(false, sendNotificationSync);
+            require(!bool(muted.getValue()), "iPad audio panel un-mutes the input");
+            audio.close.onClick(); // what a tap on OK runs
+            require(!audio.isVisible(), "iPad audio panel closes with its OK button");
+        }
         }
         temp.deleteRecursively();
         std::cout << "All audio checks passed.\n";

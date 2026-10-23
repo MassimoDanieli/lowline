@@ -9,6 +9,22 @@ class LowlineLook : public juce::LookAndFeel_V4
     void drawRotarySlider(juce::Graphics &, int, int, int, int, float, float, float, juce::Slider &) override;
     void drawButtonBackground(juce::Graphics &, juce::Button &, const juce::Colour &, bool, bool) override;
 };
+// iPad / iPhone audio and MIDI settings shown inside the interface, with a close button.
+// JUCE's own settings dialog relies on a window title bar to close, which iOS does not have.
+class LowlineAudioOverlay : public juce::Component
+{
+  public:
+    LowlineAudioOverlay(juce::AudioDeviceManager &, juce::Value &muteInput, bool italian);
+    void setLanguage(bool italian);
+    void paint(juce::Graphics &) override;
+    void resized() override;
+    juce::TextButton close{"OK"};
+
+  private:
+    juce::AudioDeviceSelectorComponent selector;
+    juce::ToggleButton mute;
+    juce::Label title;
+};
 // The whole interface, laid out at its design size (1180 x 830).
 class LowlineView : public juce::Component,
                     private juce::Timer,
@@ -71,6 +87,7 @@ class LowlineView : public juce::Component,
     std::unique_ptr<juce::FileChooser> chooser;
     std::unique_ptr<LowlineHelpWindow> helpWindow;
     std::unique_ptr<LowlineHelpOverlay> helpOverlay;
+    std::unique_ptr<LowlineAudioOverlay> audioOverlay;
     // iOS standalone: audio settings, Bluetooth MIDI pairing, remembered input un-mute.
     juce::TextButton audioButton{"AUDIO"}, bluetoothButton{"BLUETOOTH MIDI"};
     juce::Value inputMuted;
