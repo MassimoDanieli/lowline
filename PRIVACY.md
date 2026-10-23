@@ -10,7 +10,7 @@
 - **Links.** The TONE3000, help and "check for updates" buttons open web pages in your browser. Radice itself makes no network requests.
 - **Crash reports.** If you install a test version through Apple TestFlight and choose to share crash reports or feedback, Apple collects and forwards them according to Apple's privacy policy. Radice adds nothing to them.
 
-Contact: massimo@massimodanieli.com
+Contact: massimo.danieli@gmail.com
 
 ---
 
@@ -24,4 +24,4 @@ Contact: massimo@massimodanieli.com
 - **Link.** I pulsanti TONE3000, guida e "controlla aggiornamenti" aprono pagine web nel browser. Radice di per sé non fa richieste di rete.
 - **Report dei crash.** Se installi una versione di prova tramite Apple TestFlight e scegli di condividere report o feedback, è Apple a raccoglierli e inoltrarli secondo la propria privacy policy. Radice non vi aggiunge nulla.
 
-Contatto: massimo@massimodanieli.com
+Contatto: massimo.danieli@gmail.com
