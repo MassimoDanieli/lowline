@@ -56,6 +56,14 @@ endif()
 # manufacturer/plugin codes keep their original values on purpose: DAWs identify the plugin by
 # those codes, so existing sessions and presets keep loading after the rename.
 juce_add_plugin(Lowline COMPANY_NAME "Massimo Danieli" BUNDLE_ID "com.massimodanieli.lowline" PLUGIN_MANUFACTURER_CODE MsDn PLUGIN_CODE LwLn FORMATS ${LOWLINE_FORMATS} PRODUCT_NAME "Radice" IS_SYNTH FALSE NEEDS_MIDI_INPUT TRUE NEEDS_MIDI_OUTPUT FALSE IS_MIDI_EFFECT FALSE COPY_PLUGIN_AFTER_BUILD FALSE MICROPHONE_PERMISSION_ENABLED TRUE MICROPHONE_PERMISSION_TEXT "Radice uses your audio interface input to process your instrument." VST3_CATEGORIES Fx Distortion ${LOWLINE_PLATFORM_OPTIONS})
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+ # Apple rejects uploads that use "required reason" APIs without a privacy manifest (ITMS-91053).
+ # Both the app and the AUv3 extension carry one; JUCE does not generate it.
+ foreach(bundle Lowline_Standalone Lowline_AUv3)
+  target_sources(${bundle} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/packaging/PrivacyInfo.xcprivacy")
+  set_property(TARGET ${bundle} APPEND PROPERTY RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/packaging/PrivacyInfo.xcprivacy")
+ endforeach()
+endif()
 target_sources(Lowline PRIVATE Source/Processor.cpp Source/Editor.cpp Source/Workbench.cpp)
 juce_add_binary_data(LowlineHelp HEADER_NAME LowlineHelpData.h NAMESPACE LowlineHelpData
  SOURCES docs/HELP_IT.md docs/HELP_EN.md)
