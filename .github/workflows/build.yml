@@ -197,6 +197,11 @@ jobs:
           fi
           echo "App: $app"
           ls "$app/PlugIns" || echo 'Warning: no embedded AUv3 found in PlugIns'
+          # App Store Connect rejects uploads without a privacy manifest in the app and the extension.
+          test -f "$app/PrivacyInfo.xcprivacy" || { echo 'PrivacyInfo.xcprivacy missing from the app'; exit 1; }
+          for ext in "$app"/PlugIns/*.appex; do
+            test -f "$ext/PrivacyInfo.xcprivacy" || { echo "PrivacyInfo.xcprivacy missing from $ext"; exit 1; }
+          done
           /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Info.plist"
           lipo -info "$app/Radice"
 
