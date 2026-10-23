@@ -197,6 +197,9 @@ jobs:
           fi
           echo "App: $app"
           ls "$app/PlugIns" || echo 'Warning: no embedded AUv3 found in PlugIns'
+          # iOS 27 refuses to launch apps built with its SDK that do not use the UIScene life cycle.
+          /usr/libexec/PlistBuddy -c 'Print :UIApplicationSceneManifest' "$app/Info.plist" \
+            || { echo 'UIApplicationSceneManifest missing: the app would not launch on iOS 27'; exit 1; }
           # App Store Connect rejects uploads without a privacy manifest in the app and the extension.
           test -f "$app/PrivacyInfo.xcprivacy" || { echo 'PrivacyInfo.xcprivacy missing from the app'; exit 1; }
           for ext in "$app"/PlugIns/*.appex; do
