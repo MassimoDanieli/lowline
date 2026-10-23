@@ -7,7 +7,8 @@ permissions:
   contents: read
 concurrency:
   group: native-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel main: a cancelled run could stop between creating the draft release and publishing it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   build:
     name: ${{ matrix.platform }}
@@ -229,7 +230,22 @@ jobs:
           VERSION=$(sed -nE 's/^project\(Lowline VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' source/CMakeLists.txt)
           test -n "$VERSION"
           TAG="v$VERSION"
-          if gh release view "$TAG" >/dev/null 2>&1; then
+          # Publish only when the user-facing documents describe this version, so a version bump
+          # in CMakeLists.txt during development does not ship with the previous version's docs.
+          STALE=""
+          head -n 1 source/README.md | grep -q "^# Lowline $VERSION\b" || STALE="$STALE README.md"
+          head -n 1 source/LEGGIMI.md | grep -q "^# Lowline $VERSION\b" || STALE="$STALE LEGGIMI.md"
+          head -n 1 source/VALIDATION.md | grep -q "Lowline $VERSION\b" || STALE="$STALE VALIDATION.md"
+          grep -qE "^# (Lowline )?$VERSION([^0-9.]|$)" source/CHANGELOG.md || STALE="$STALE CHANGELOG.md"
+          if [[ -n "$STALE" ]]; then
+            echo "::warning::Not publishing $TAG: these files do not describe version $VERSION yet:$STALE"
+            echo "Release $TAG not published: update$STALE to $VERSION first." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [[ "$(gh release view "$TAG" --json isDraft -q .isDraft 2>/dev/null || true)" == true ]]; then
+            # A draft left by an interrupted run is not public: replace it instead of blocking the version.
+            gh release delete "$TAG" --yes
+          elif gh release view "$TAG" >/dev/null 2>&1; then
             echo "Version $VERSION already exists; never overwrite a published version. Bump CMakeLists.txt to release."
             exit 0
           fi

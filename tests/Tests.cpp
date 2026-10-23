@@ -3,6 +3,7 @@
 #include "../Source/Workbench.h"
 #include <iostream>
 #include <stdexcept>
+#include <thread>
 using namespace juce;
 void require(bool ok, const char *what)
 {
@@ -480,6 +481,13 @@ int main(int argc, char **argv)
         wait(p);
         require(p.slotName(LowlineProcessor::Amp) == "(empty)" && p.status().contains("File not found"),
                 "missing preset asset clears stale model and preserves loader error");
+        {
+            MemoryBlock resaved;
+            p.getStateInformation(resaved);
+            auto resavedXml = AudioProcessor::getXmlFromBinary(resaved.getData(), int(resaved.getSize()));
+            require(resavedXml != nullptr && resavedXml->getStringAttribute("file1") == model.getFullPathName(),
+                    "saving a session with a missing file keeps the file's path");
+        }
         LowlineProcessor bypassProcessor;
         bypassProcessor.prepareToPlay(48000, 256);
         AudioBuffer<float> bypassAudio(2, 256);
@@ -489,6 +497,55 @@ int main(int argc, char **argv)
         bypassProcessor.processBlockBypassed(bypassAudio, none);
         require(bypassAudio.getSample(0, 0) == 0 && std::abs(bypassAudio.getSample(0, 48) - .2f) < .00001f,
                 "host bypass retains declared latency");
+        {
+            set(bypassProcessor, "blend", 50);
+            AudioBuffer<float> bypassed(2, 256);
+            bypassed.clear();
+            MidiBuffer footswitch;
+            footswitch.addEvent(MidiMessage::controllerEvent(1, 45, 0), 0);
+            bypassProcessor.processBlockBypassed(bypassed, footswitch);
+            require(bypassProcessor.state.getRawParameterValue("blend")->load() == 0,
+                    "MIDI controllers still work while the host bypasses the plugin");
+        }
+        {
+            // Fix 3: a factory Program Change from the audio thread is applied on the message thread.
+            LowlineProcessor factory;
+            factory.prepareToPlay(48000, 256);
+            factory.setCurrentProgram(0);
+            set(factory, "attack", 80);
+            AudioBuffer<float> audio(2, 256);
+            audio.clear();
+            MidiBuffer change;
+            change.addEvent(MidiMessage::programChange(1, 2), 0);
+            std::thread audioThread([&] { factory.processBlock(audio, change); });
+            audioThread.join();
+            require(factory.getCurrentProgram() == 0 && factory.state.getRawParameterValue("attack")->load() == 80,
+                    "factory Program Change does not write parameters on the audio thread");
+            factory.handleUpdateNowIfNeeded();
+            require(factory.getCurrentProgram() == 2 && factory.state.getRawParameterValue("attack")->load() == 15
+                        && factory.presetName() == factory.getProgramName(2),
+                    "factory Program Change is applied and named on the message thread");
+        }
+        {
+            // Fix 1: hosts that restore a session and then change the block size keep the rig.
+            bool kept = true;
+            for (int attempt = 0; attempt < 12 && kept; ++attempt)
+            {
+                LowlineProcessor host;
+                host.prepareToPlay(48000, 256);
+                host.loadFile(LowlineProcessor::Amp, otherModel);
+                wait(host);
+                MemoryBlock session;
+                host.getStateInformation(session);
+                LowlineProcessor reopened;
+                reopened.setStateInformation(session.getData(), int(session.getSize()));
+                Thread::sleep(attempt % 4);
+                reopened.prepareToPlay(48000, 128 + 64 * (attempt % 3));
+                wait(reopened);
+                kept = reopened.slotName(LowlineProcessor::Amp) == otherModel.getFileName();
+            }
+            require(kept, "a session restored while the host changes block size keeps its models");
+        }
         auto rightIR = temp.getChildFile("right-only.wav");
         {
             WavAudioFormat wav;

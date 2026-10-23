@@ -146,6 +146,9 @@ class LowlineProcessor : public juce::AudioProcessor,
     mutable std::mutex metadataMutex;
     std::array<juce::String, 4> paths{};
     std::array<juce::Time, 4> modified{};
+    // What a saved session or preset asks for, slot by slot. Kept while a file is missing or still
+    // loading, so saving never erases a path that this machine simply cannot resolve right now.
+    std::array<juce::String, 4> sessionPaths{};
     juce::String message = "Ready / Pronto";
     std::mutex jobsMutex;
     std::condition_variable jobsReady;
@@ -157,7 +160,10 @@ class LowlineProcessor : public juce::AudioProcessor,
         juce::String warning;
         std::array<juce::File, 4> files;
         std::array<bool, 4> keep{}; // scene: slot already holds this exact file
+        std::array<juce::String, 4> wanted; // scene: paths to keep in saved state, even if missing
+        int attempts = 0;                   // retries after the host changed sample rate / block size
     };
+    struct SetupChanged : std::runtime_error { using std::runtime_error::runtime_error; };
     std::deque<Job> jobs;
     bool stopping = false;
     std::thread worker;
@@ -192,7 +198,7 @@ class LowlineProcessor : public juce::AudioProcessor,
     std::atomic<bool> clearUndoPending{false};
     void restoreState(const void *, int, bool keepUndo);
     void applyProgram(int);
-    std::atomic<int> programNamePending{-1};
+    std::atomic<int> factoryProgramPending{-1};
     juce::String cleanSignature;
     std::atomic<bool> cleanWhenReady{false};
     std::atomic<bool> measureRequested{false};
