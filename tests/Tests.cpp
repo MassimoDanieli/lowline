@@ -517,6 +517,7 @@ int main(int argc, char **argv)
             audio.clear();
             MidiBuffer change;
             change.addEvent(MidiMessage::programChange(1, 2), 0);
+            const auto undoBefore = factory.undo.getUndoDescriptions();
             std::thread audioThread([&] { factory.processBlock(audio, change); });
             audioThread.join();
             require(factory.getCurrentProgram() == 0 && factory.state.getRawParameterValue("attack")->load() == 80,
@@ -525,6 +526,7 @@ int main(int argc, char **argv)
             require(factory.getCurrentProgram() == 2 && factory.state.getRawParameterValue("attack")->load() == 15
                         && factory.presetName() == factory.getProgramName(2),
                     "factory Program Change is applied and named on the message thread");
+            require(factory.undo.getUndoDescriptions() == undoBefore, "MIDI Program Change is not an undo step");
         }
         {
             // Fix 1: hosts that restore a session and then change the block size keep the rig.

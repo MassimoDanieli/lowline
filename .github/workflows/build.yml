@@ -233,9 +233,10 @@ jobs:
           # Publish only when the user-facing documents describe this version, so a version bump
           # in CMakeLists.txt during development does not ship with the previous version's docs.
           STALE=""
-          head -n 1 source/README.md | grep -q "^# Lowline $VERSION\b" || STALE="$STALE README.md"
-          head -n 1 source/LEGGIMI.md | grep -q "^# Lowline $VERSION\b" || STALE="$STALE LEGGIMI.md"
-          head -n 1 source/VALIDATION.md | grep -q "Lowline $VERSION\b" || STALE="$STALE VALIDATION.md"
+          V="${VERSION//./\\.}" # dots are literal in the patterns below
+          head -n 1 source/README.md | grep -q "^# Lowline $V\b" || STALE="$STALE README.md"
+          head -n 1 source/LEGGIMI.md | grep -q "^# Lowline $V\b" || STALE="$STALE LEGGIMI.md"
+          head -n 1 source/VALIDATION.md | grep -q "Lowline $V\b" || STALE="$STALE VALIDATION.md"
           grep -qE "^# (Lowline )?$VERSION([^0-9.]|$)" source/CHANGELOG.md || STALE="$STALE CHANGELOG.md"
           if [[ -n "$STALE" ]]; then
             echo "::warning::Not publishing $TAG: these files do not describe version $VERSION yet:$STALE"

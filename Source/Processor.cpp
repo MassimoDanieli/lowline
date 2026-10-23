@@ -902,8 +902,10 @@ void LowlineProcessor::savePreset(const File &f, bool portable)
             const String path = tree.getProperty("file" + String(slot)).toString();
             if (path.isEmpty()) continue;
             File asset(path);
+            if (!asset.existsAsFile())
+            { setStatus("Portable save failed: " + asset.getFileName() + " is missing. Load it again or clear the slot."); return; }
             const auto size = asset.getSize(); total += size;
-            if (!asset.existsAsFile() || size <= 0 || size > 64 * 1024 * 1024 || total > 192 * 1024 * 1024)
+            if (size <= 0 || size > 64 * 1024 * 1024 || total > 192 * 1024 * 1024)
             { setStatus("Portable save failed: missing or oversized asset (64 MB/file, 192 MB total)."); return; }
             MemoryBlock bytes;
             if (!asset.loadFileAsData(bytes)) { setStatus("Cannot read asset for portable preset."); return; }
@@ -977,7 +979,11 @@ void LowlineProcessor::handleAsyncUpdate()
     if (clearUndoPending.exchange(false)) undo.clearUndoHistory();
     if (midiSettingsDirty) saveMidiSettings();
     if (const int factory = factoryProgramPending.exchange(-1); factory >= 0)
-        setCurrentProgram(factory); // message thread: applies, names and records undo
+    {
+        // Applied here, not on the audio thread. Like all MIDI, it is not an undo step.
+        applyProgram(factory);
+        state.state.setProperty("presetName", getProgramName(factory), nullptr);
+    }
     MemoryBlock bytes;
     { std::lock_guard g(presetMutex); bytes.swapWith(pendingPreset); }
     if (bytes.getSize() == 0) return;
