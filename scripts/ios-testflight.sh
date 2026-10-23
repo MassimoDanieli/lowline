@@ -18,6 +18,19 @@ cmake -S . -B "$out" -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TAR
 rm -rf "$out/Lowline.xcarchive" "$out/export"
 xcodebuild -project "$out/Lowline.xcodeproj" -scheme Lowline_Standalone -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$out/Lowline.xcarchive" -allowProvisioningUpdates archive
+# Xcode archives the app's dSYM but not the AUv3's: add it when its UUID matches the archived
+# extension, so TestFlight can symbolicate plugin crashes too.
+archived_appex="$out/Lowline.xcarchive/Products/Applications/Radice.app/PlugIns/Radice.appex/Radice"
+appex_dsym=$(find "$out" -path '*Release*' -name 'Radice.appex.dSYM' -type d -not -path '*.xcarchive/*' -print -quit)
+if [[ -f "$archived_appex" && -n "$appex_dsym" ]]; then
+  want=$(dwarfdump --uuid "$archived_appex" | awk '{print $2}' | sort)
+  have=$(dwarfdump --uuid "$appex_dsym" | awk '{print $2}' | sort)
+  if [[ "$want" == "$have" ]]; then
+    cp -R "$appex_dsym" "$out/Lowline.xcarchive/dSYMs/"
+  else
+    echo "Note: AUv3 dSYM UUID does not match the archived extension; plugin crashes stay unsymbolicated."
+  fi
+fi
 cat > "$out/ExportOptions.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

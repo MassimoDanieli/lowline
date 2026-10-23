@@ -1,4 +1,4 @@
-# Radice 0.5.0
+# Radice 0.5.1
 
 *Radice si chiamava Lowline fino alla 0.4: le sessioni delle DAW e i preset .lowline continuano ad aprirsi.*
 
