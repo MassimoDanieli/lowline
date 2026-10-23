@@ -35,6 +35,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
  # Archive only the app (JUCE marks it SKIP_INSTALL=NO); helper static libraries stay out, or
  # Xcode would produce a "generic archive" that cannot be uploaded.
  set(CMAKE_XCODE_ATTRIBUTE_SKIP_INSTALL "YES")
+ # Debug symbols in a separate dSYM, so TestFlight and Xcode show function names in crash reports.
+ set(CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym")
+ set(CMAKE_XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS "YES")
  list(APPEND LOWLINE_PLATFORM_OPTIONS
   BUILD_VERSION "${LOWLINE_BUILD_NUMBER}"
   ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/packaging/icon-1024.png"
