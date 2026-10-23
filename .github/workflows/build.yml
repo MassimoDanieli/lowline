@@ -230,6 +230,13 @@ jobs:
           VERSION=$(sed -nE 's/^project\(Lowline VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' source/CMakeLists.txt)
           test -n "$VERSION"
           TAG="v$VERSION"
+          if [[ "$(gh release view "$TAG" --json isDraft -q .isDraft 2>/dev/null || true)" == true ]]; then
+            # A draft left by an interrupted run is not public: replace it instead of blocking the version.
+            gh release delete "$TAG" --yes
+          elif gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Version $VERSION already exists; never overwrite a published version. Bump CMakeLists.txt to release."
+            exit 0
+          fi
           # Publish only when the user-facing documents describe this version, so a version bump
           # in CMakeLists.txt during development does not ship with the previous version's docs.
           STALE=""
@@ -241,13 +248,6 @@ jobs:
           if [[ -n "$STALE" ]]; then
             echo "::warning::Not publishing $TAG: these files do not describe version $VERSION yet:$STALE"
             echo "Release $TAG not published: update$STALE to $VERSION first." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          if [[ "$(gh release view "$TAG" --json isDraft -q .isDraft 2>/dev/null || true)" == true ]]; then
-            # A draft left by an interrupted run is not public: replace it instead of blocking the version.
-            gh release delete "$TAG" --yes
-          elif gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Version $VERSION already exists; never overwrite a published version. Bump CMakeLists.txt to release."
             exit 0
           fi
           # Release notes: the CHANGELOG section of this version (from its heading to the next one).
