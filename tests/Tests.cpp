@@ -1,4 +1,5 @@
 #include "../Source/Processor.h"
+#include "../Source/Platform.h"
 #include "../Source/Help.h"
 #include "../Source/Workbench.h"
 #include <iostream>
@@ -78,6 +79,37 @@ int main(int argc, char **argv)
     auto settingsFolder = File::getSpecialLocation(File::tempDirectory).getChildFile("lowline-test-settings");
     settingsFolder.deleteRecursively();
     LowlineProcessor::settingsOverride() = settingsFolder;
+    {
+        // Renamed from Lowline: small settings files are copied once into the Radice folder.
+        auto base = File::getSpecialLocation(File::tempDirectory).getChildFile("radice-migration-" + String(Random::getSystemRandom().nextInt64()));
+        base.getChildFile("Lowline").createDirectory();
+        base.getChildFile("Lowline/midi-controller.xml").replaceWithText("<LowlineMidi/>");
+        base.getChildFile("Lowline/library.xml").replaceWithText("<LowlineLibrary/>");
+        const auto migrated = lowline::platform::appData(base);
+        require(migrated == base.getChildFile("Radice") && migrated.getChildFile("midi-controller.xml").loadFileAsString() == "<LowlineMidi/>"
+                    && migrated.getChildFile("library.xml").existsAsFile() && base.getChildFile("Lowline/library.xml").existsAsFile(),
+                "Lowline settings are copied to Radice and the originals stay in place");
+        migrated.getChildFile("midi-controller.xml").replaceWithText("<LowlineMidi changed=\"1\"/>");
+        lowline::platform::appData(base);
+        require(migrated.getChildFile("midi-controller.xml").loadFileAsString().contains("changed"),
+                "the migration runs only once and never overwrites Radice settings");
+        require(lowline::platform::isPreset(File("/x/a.radice")) && lowline::platform::isPreset(File("/x/a.lowline"))
+                    && !lowline::platform::isPreset(File("/x/a.nam")),
+                "both .radice and .lowline files are recognised as presets");
+        // An existing Radice folder (e.g. created by the standalone's own settings on Windows)
+        // must not block copying a file that is still missing.
+        base.getChildFile("Lowline/window.xml").replaceWithText("<LowlineWindow width=\"900\"/>");
+        lowline::platform::appData(base);
+        require(migrated.getChildFile("window.xml").existsAsFile(), "a missing settings file is copied even if the Radice folder exists");
+        auto oldSettings = base.getChildFile("Old/Lowline.settings"), newSettings = base.getChildFile("New/Radice.settings");
+        oldSettings.create(); oldSettings.replaceWithText("<PROPERTIES><VALUE name=\"audioSetup\"/></PROPERTIES>");
+        require(lowline::platform::migrateStandaloneSettings(oldSettings, newSettings) && newSettings.loadFileAsString().contains("audioSetup")
+                    && !lowline::platform::migrateStandaloneSettings(oldSettings, newSettings),
+                "the standalone audio setup is carried over once from Lowline.settings");
+        require(lowline::platform::standaloneSettings("Radice").getDefaultFile().getFileName() == "Radice.settings",
+                "the standalone settings path follows JUCE's naming");
+        base.deleteRecursively();
+    }
     try
     {
         lowline::Compressor c;
@@ -282,6 +314,12 @@ int main(int argc, char **argv)
         settle(p, b, .2f);
         require(p.slotName(LowlineProcessor::Amp) == "(empty)" && std::abs(b.getSample(0, 255) - .2f) < .001f,
                 "removed NAM remains removed after prepareToPlay");
+        {
+            auto radicePreset = temp.getChildFile("roundtrip.radice");
+            set(p, "blend", 41); p.savePreset(radicePreset); set(p, "blend", 3);
+            p.openPreset(radicePreset); wait(p);
+            require(std::abs(p.state.getRawParameterValue("blend")->load() - 41) < .01f, "a .radice preset saves and opens");
+        }
         auto wrongPreset = temp.getChildFile("wrong.lowline");
         MemoryBlock wrongBytes;
         XmlElement wrongRoot("OtherApplication");

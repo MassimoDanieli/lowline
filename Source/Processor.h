@@ -25,7 +25,7 @@ class LowlineProcessor : public juce::AudioProcessor,
     bool isBusesLayoutSupported(const BusesLayout &) const override;
     juce::AudioProcessorEditor *createEditor() override;
     bool hasEditor() const override { return true; }
-    const juce::String getName() const override { return "Lowline"; }
+    const juce::String getName() const override { return "Radice"; }
     bool acceptsMidi() const override { return true; }
     bool producesMidi() const override { return false; }
     double getTailLengthSeconds() const override { return 90; }

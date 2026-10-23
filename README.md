@@ -1,16 +1,31 @@
-# Lowline 0.3.0 — Bass NAM + IR rig
+# Radice 0.5.0 — Bass NAM + IR rig
 
-A free, open-source native bass rig for macOS (Apple Silicon + Intel), Windows x64 and Linux x64. Standalone and VST3; AU is also built for macOS. Original project for Massimo Danieli, not affiliated with NamRay, Neural Amp Modeler or TONE3000.
+A free, open-source native bass rig for macOS (Apple Silicon + Intel), Windows x64 and Linux x64, plus an iPad/iPhone app and AUv3. Standalone and VST3; AU is also built for macOS. Original project for Massimo Danieli, not affiliated with NamRay, Neural Amp Modeler or TONE3000.
+
+*Radice was called Lowline up to 0.4. DAW sessions and `.lowline` presets keep opening; see [Renamed from Lowline](#renamed-from-lowline).*
 
 ## ⬇️ Scarica / Download
 
-**[🍎 Mac — Apple Silicon + Intel](https://github.com/MassimoDanieli/lowline/releases/download/v0.3.0/Lowline-macOS-universal.zip)** · **[Windows x64](https://github.com/MassimoDanieli/lowline/releases/download/v0.3.0/Lowline-Windows-x64.zip)** · **[Linux x64](https://github.com/MassimoDanieli/lowline/releases/download/v0.3.0/Lowline-Linux-x64.tar.gz)**
+**[🍎 Mac — Apple Silicon + Intel](https://github.com/MassimoDanieli/radice/releases/latest/download/Radice-macOS-universal.zip)** · **[Windows x64](https://github.com/MassimoDanieli/radice/releases/latest/download/Radice-Windows-x64.zip)** · **[Linux x64](https://github.com/MassimoDanieli/radice/releases/latest/download/Radice-Linux-x64.tar.gz)**
 
-App pronta all'uso: non serve compilare. / Ready-built app: no compilation needed.
+App pronta all'uso: non serve compilare. / Ready-built app: no compilation needed. These links always download the latest release.
 
-[All downloads / Tutti i download](https://github.com/MassimoDanieli/lowline/releases/latest) · [Guida italiana](docs/HELP_IT.md) · [English guide](docs/HELP_EN.md)
+[All downloads / Tutti i download](https://github.com/MassimoDanieli/radice/releases/latest) · [Guida italiana](docs/HELP_IT.md) · [English guide](docs/HELP_EN.md)
 
-![Lowline rig](preview.png)
+![Radice rig](preview.png)
+
+## New in 0.5
+
+- **New name:** Lowline is now Radice — the root note, the one the bass plays.
+- **DAW sessions:** a session no longer opens silent when the host changes sample rate or buffer while models load, and saving no longer erases the path of a capture that is missing on this machine.
+- **MIDI:** factory Program Changes are applied off the audio thread; footswitches and Program Changes keep working while the host bypasses the plugin.
+
+## Renamed from Lowline
+
+- The plugin keeps its internal codes and bundle ID, so DAW sessions made with Lowline load Radice in its place.
+- `.lowline` presets open as before; new presets are saved as `.radice`.
+- MIDI map, Program Change bank, library, window size and the standalone app's audio setup are copied from Lowline on first launch (the originals are left in place).
+- Mac: the installer moves an existing Lowline app/AU/VST3 in your user folders aside, because two plugins with the same codes confuse hosts. If you installed Lowline by hand (for example in /Library/Audio/Plug-Ins), remove the old `Lowline.*` bundles yourself. Windows/Linux: delete the old `Lowline.vst3` when you copy `Radice.vst3`.
 
 ## New in 0.3
 
@@ -23,7 +38,7 @@ App pronta all'uso: non serve compilare. / Ready-built app: no compilation neede
 - **Setup:** live audio diagnostics, setup checklist and on-demand link to the latest release.
 - **Mac installation:** DMG and ZIP with a per-user installation helper; public packages remain unsigned/unnotarised.
 
-[Mac DMG](https://github.com/MassimoDanieli/lowline/releases/download/v0.3.0/Lowline-macOS-universal.dmg) · [Installation instructions](packaging/README-INSTALL.txt)
+[Mac DMG](https://github.com/MassimoDanieli/radice/releases/latest/download/Radice-macOS-universal.dmg) · [Installation instructions](packaging/README-INSTALL.txt)
 
 ![Practice workspace](docs/practice-preview.png)
 
@@ -37,7 +52,7 @@ App pronta all'uso: non serve compilare. / Ready-built app: no compilation neede
 - Optional NAM level compensation from loudness metadata, bounded to ±18 dB per model. Models without valid metadata retain their gain.
 - Delay sync to host or manual BPM, six subdivisions, tap tempo and low cut.
 - MIDI learn for parameters and tap tempo, persistent mappings and PC 0–127 assignments to user presets.
-- Portable .lowline export containing the loaded NAM/IR assets.
+- Portable .radice export containing the loaded NAM/IR assets.
 - 50 ms crossfades for NAM and IR replacement. Engines are prepared and retired off the audio thread.
 - Audio processing-load indicator and dedicated RIG, TOOLS and MIDI pages.
 
@@ -49,9 +64,9 @@ The rig also includes compression, saturation booster, NAM pedal and amp slots, 
 
 ## Download and quick start
 
-Download a package using the links above, or open [Releases](https://github.com/MassimoDanieli/lowline/releases/latest) and expand **Assets**. Choose the file for your operating system, not the automatically generated “Source code” archives. Extract the downloaded archive. Public release downloads do not require a GitHub account and do not have the 30-day Actions artifact expiry.
+Download a package using the links above, or open [Releases](https://github.com/MassimoDanieli/radice/releases/latest) and expand **Assets**. Choose the file for your operating system, not the automatically generated “Source code” archives. Extract the downloaded archive. Public release downloads do not require a GitHub account and do not have the 30-day Actions artifact expiry.
 
-The 0.3.0 packages passed [native builds and regression tests on macOS, Windows and Linux](https://github.com/MassimoDanieli/lowline/actions/runs/39188625927). Release publication is gated on all three jobs succeeding.
+Every release is published only after native builds, regression tests and pluginval pass on macOS, Windows and Linux (and auval on macOS); the release notes link the run.
 
 On Mac, run the standalone app or install the AU/VST3 bundle in your user's Audio/Plug-Ins folders. The app is not Developer-ID signed or notarised. See the guide for installation and audio setup.
 
@@ -91,7 +106,7 @@ MIDI learn: select a target on MIDI, click LEARN, move the controller. CLEAR rem
 
 Default CCs: 20 compressor, 21 booster, 22 pedal, 23 amp, 24 cab, 25 delay, 26 reverb, 27 bypass, 11 blend, 7 output (−36 to +6 dB). Learned output uses the full −36 to +12 dB range. Calibrate expression pedals on the controller.
 
-PC 0–3 recalls factory starting configurations unless a user file is assigned. Any PC 0–127 can recall an assigned .lowline file on the background worker. The MIDI map and bank are global (one settings file for the app and all plugin instances): no preset, recalled or opened, ever changes them.
+PC 0–3 recalls factory starting configurations unless a user file is assigned. Any PC 0–127 can recall an assigned .radice (or .lowline) file on the background worker. The MIDI map and bank are global (one settings file for the app and all plugin instances): no preset, recalled or opened, ever changes them.
 
 Older presets load with neutral defaults for the new effects. Keep backups when moving between versions; 0.2 exports are not designed for older versions.
 
@@ -115,7 +130,7 @@ Xcode 16+ on a Mac. CI compiles the iOS app and AUv3 on every push (unsigned). T
 LOWLINE_TEAM_ID=XXXXXXXXXX scripts/ios-testflight.sh
 ```
 
-On iOS, picked files are copied into the app's Documents ("On My iPad › Lowline"), presets and recordings are saved there, and the AUDIO button opens input/buffer settings. Landscape only; the interface is the iPad layout, scaled.
+On iOS, picked files are copied into the app's Documents ("On My iPad › Radice"), presets and recordings are saved there, and the AUDIO button opens input/buffer settings. Landscape only; the interface is the iPad layout, scaled.
 
 ## Practical limits
 
@@ -129,4 +144,4 @@ Practice settings, A/B snapshots and match trim are temporary and are not saved 
 
 ## License
 
-Original Lowline code: AGPL-3.0-only. JUCE is used under AGPLv3; NAM core is MIT; dependencies retain their licences. See LICENSE and THIRD_PARTY_NOTICES.md. Community captures have their own redistribution terms.
+Original Radice code: AGPL-3.0-only. JUCE is used under AGPLv3; NAM core is MIT; dependencies retain their licences. See LICENSE and THIRD_PARTY_NOTICES.md. Community captures have their own redistribution terms.

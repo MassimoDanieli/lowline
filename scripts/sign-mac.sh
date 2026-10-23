@@ -8,11 +8,11 @@
 set -euo pipefail
 : "${LOWLINE_SIGN_IDENTITY:?Set LOWLINE_SIGN_IDENTITY to your Developer ID Application identity}"
 : "${LOWLINE_NOTARY_PROFILE:?Set LOWLINE_NOTARY_PROFILE to your stored notarytool profile}"
-package_dir="${1:?Usage: sign-mac.sh /path/to/package/Lowline}"
+package_dir="${1:?Usage: sign-mac.sh /path/to/package/Radice}"
 here="$(cd "$(dirname "$0")" && pwd)"
 keychain_args=()
 if [[ -n "${LOWLINE_KEYCHAIN:-}" ]]; then keychain_args=(--keychain "$LOWLINE_KEYCHAIN"); fi
-bundles=("$package_dir/Standalone/Lowline.app" "$package_dir/AU/Lowline.component" "$package_dir/VST3/Lowline.vst3")
+bundles=("$package_dir/Standalone/Radice.app" "$package_dir/AU/Radice.component" "$package_dir/VST3/Radice.vst3")
 for bundle in "${bundles[@]}"; do
   entitlements=()
   # The standalone app records the bass input: the hardened runtime needs the audio-input entitlement.
@@ -21,12 +21,12 @@ for bundle in "${bundles[@]}"; do
     ${keychain_args[@]+"${keychain_args[@]}"} --sign "$LOWLINE_SIGN_IDENTITY" "$bundle"
   codesign --verify --strict --verbose=2 "$bundle"
 done
-archive="$(mktemp -d)/Lowline-notarisation.zip"
+archive="$(mktemp -d)/Radice-notarisation.zip"
 ditto -c -k --keepParent "$package_dir" "$archive"
 xcrun notarytool submit "$archive" --keychain-profile "$LOWLINE_NOTARY_PROFILE" ${keychain_args[@]+"${keychain_args[@]}"} --wait
 for bundle in "${bundles[@]}"; do
   xcrun stapler staple "$bundle"
   xcrun stapler validate "$bundle"
 done
-spctl --assess --type execute -vv "$package_dir/Standalone/Lowline.app"
+spctl --assess --type execute -vv "$package_dir/Standalone/Radice.app"
 echo 'Signed and notarised bundles ready; create distribution archives from these bundles.'

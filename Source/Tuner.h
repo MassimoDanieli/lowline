@@ -8,7 +8,7 @@
 class LowlineTuner : private juce::Thread
 {
   public:
-    LowlineTuner() : Thread("Lowline tuner") {}
+    LowlineTuner() : Thread("Radice tuner") {}
     ~LowlineTuner() override { stopThread(-1); }
     std::atomic<float> frequency{0};
     void prepare(double sr)

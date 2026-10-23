@@ -51,7 +51,7 @@ class LowlineHelpContent : public juce::Component
             else if (!sections.isEmpty())
                 sections.getReference(sections.size() - 1) += line + "\n";
         }
-        title.setText(italian ? "Lowline / Guida utente" : "Lowline / User guide",
+        title.setText(italian ? "Radice / Guida utente" : "Radice / User guide",
                       juce::dontSendNotification);
         language.setButtonText(italian ? "ENGLISH" : "ITALIANO");
         topics.clear(juce::dontSendNotification);
@@ -124,7 +124,7 @@ class LowlineHelpWindow : public juce::DocumentWindow
 {
   public:
     explicit LowlineHelpWindow(bool italian)
-        : DocumentWindow("Lowline / Help", juce::Colour(0xff11151b), closeButton)
+        : DocumentWindow("Radice / Help", juce::Colour(0xff11151b), closeButton)
     {
         setUsingNativeTitleBar(true);
         setContentOwned(new LowlineHelpContent(italian), true);

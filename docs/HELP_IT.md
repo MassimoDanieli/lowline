@@ -1,16 +1,18 @@
-# Lowline 0.3 — Guida utente
+# Radice 0.5 — Guida utente
 
 ## 01 · Inizia da qui
-Lowline è un rig per basso: combina gate, compressore, booster, due modelli NAM, cassa a risposta impulsiva (IR), equalizzatore, suono pulito parallelo, delay stereo e riverbero IR. Funziona come app autonoma oppure come plugin VST3; su Mac è disponibile anche AU.
+Radice è un rig per basso: combina gate, compressore, booster, due modelli NAM, cassa a risposta impulsiva (IR), equalizzatore, suono pulito parallelo, delay stereo e riverbero IR. Funziona come app autonoma oppure come plugin VST3; su Mac è disponibile anche AU.
 
 Per una prima prova:
 1. Collega il basso alla Scarlett, attiva INST sull'ingresso usato e abbassa il volume delle cuffie.
 2. Nell'app autonoma apri Options / Audio settings e scegli Scarlett come ingresso e uscita. Se compare “Mute audio input”, disattivalo per sentire lo strumento.
-3. Scegli Input 1 / Left oppure Input 2 / Right in Lowline, in base alla presa utilizzata.
+3. Scegli Input 1 / Left oppure Input 2 / Right in Radice, in base alla presa utilizzata.
 4. Parti da 48 kHz e buffer di 128 o 256 campioni. Se il modello NAM richiede un'altra frequenza, imposta quella e ricaricalo.
 5. Disattiva il direct monitoring della Scarlett per ascoltare soltanto il segnale elaborato.
 6. Scegli Clean foundation. Puoi già suonare senza modelli: gli slot vuoti lasciano passare il segnale.
 7. Carica un modello amp .nam e, se serve, una cassa IR. Attiva AMP ON e CAB ON, quindi regola AMP / CLEAN e OUTPUT.
+
+Radice si chiamava Lowline fino alla versione 0.4. Le sessioni delle DAW e i preset .lowline continuano ad aprirsi; i nuovi preset si salvano come .radice. Al primo avvio vengono copiati da Lowline mappa MIDI, banco Program Change, libreria e, nell'app autonoma, impostazioni audio e ultimo suono. Rimuovi i vecchi plugin Lowline: due plugin con gli stessi codici confondono le DAW (su Mac l'installer lo fa per te).
 
 Il verde indica un pulsante attivo; un pulsante scuro è spento. Le parole “ON” sono etichette fisse: guarda il colore per conoscere lo stato. Una spia attiva non significa che nello slot sia stato caricato un file.
 
@@ -33,14 +35,14 @@ Input 1 / Left usa il primo canale; Input 2 / Right usa il secondo, se disponibi
 
 Trascina una manopola per cambiarla; fai doppio clic per ripristinare il valore predefinito del parametro. Puoi modificare direttamente il numero sotto la manopola e premere Invio.
 
-SALVA e APRI gestiscono i preset .lowline. ESPORTA crea un preset portabile con modelli e IR incorporati. Il menu in alto a destra contiene quattro configurazioni iniziali di fabbrica. IT / EN nella schermata principale cambia la lingua dell'interfaccia; i nomi tecnici dei controlli restano in inglese.
+SALVA e APRI gestiscono i preset .radice. ESPORTA crea un preset portabile con modelli e IR incorporati. Il menu in alto a destra contiene quattro configurazioni iniziali di fabbrica. IT / EN nella schermata principale cambia la lingua dell'interfaccia; i nomi tecnici dei controlli restano in inglese.
 
 ## 03 · Livelli, CPU e accordatore
 INPUT: da −36 a +24 dB. Regola il segnale prima del compressore e dei modelli. Aumentarlo può far saturare maggiormente una cattura NAM: non equivale ad alzare soltanto il volume finale.
 
 OUTPUT: da −36 a +12 dB. Regola il livello dopo gli effetti e prima del limiter. Parti da −6 dB e confronta i suoni a volume simile.
 
-Prima regola il gain fisico della Scarlett: suonando forte, l'ingresso non deve andare in clipping. Abbassare OUTPUT in Lowline non corregge una distorsione già prodotta dall'ingresso della scheda.
+Prima regola il gain fisico della Scarlett: suonando forte, l'ingresso non deve andare in clipping. Abbassare OUTPUT in Radice non corregge una distorsione già prodotta dall'ingresso della scheda.
 
 IN e OUT mostrano i picchi dei blocchi audio in dBFS, non una misura di volume percepito. IN si riferisce al segnale in ingresso prima del gain software. Valori vicini a −180 dB indicano silenzio numerico. GR mostra la riduzione di guadagno del compressore in dB.
 
@@ -84,7 +86,7 @@ Una cattura può già includere cassa e microfono. In quel caso prova CAB spento
 
 Sono accettati modelli .nam mono con ingresso e uscita mono. Il core supporta A2, ma compatibilità e carico CPU dipendono dalla cattura. Se la frequenza richiesta non coincide con quella del dispositivo, segui il messaggio di stato, cambia frequenza e ricarica il modello. NORMALISE, nella scheda STRUMENTI, abilita una compensazione del volume basata sul campo loudness del modello NAM. NAM TARGET imposta il riferimento da −30 a −6 dB; la correzione per ciascun modello è limitata a ±18 dB e viene applicata gradualmente. Il valore di default è −18 dB.
 
-PEDAL e AMP mostrano il loudness dichiarato; “nessun dato” significa che la cattura è vuota o non include un dato valido. In quel caso Lowline lascia il guadagno del modello invariato: non inventa una misura e non fa un'analisi automatica del volume percepito. La compensazione del PEDAL modifica anche il livello che entra nell'AMP, quindi può cambiarne la saturazione. La calibrazione fisica d'ingresso in dBu resta manuale.
+PEDAL e AMP mostrano il loudness dichiarato; “nessun dato” significa che la cattura è vuota o non include un dato valido. In quel caso Radice lascia il guadagno del modello invariato: non inventa una misura e non fa un'analisi automatica del volume percepito. La compensazione del PEDAL modifica anche il livello che entra nell'AMP, quindi può cambiarne la saturazione. La calibrazione fisica d'ingresso in dBu resta manuale.
 
 Il cambio NAM/IR usa una dissolvenza di 50 ms fra il motore precedente e quello nuovo, preparato fuori dal callback audio. Se arrivano molte richieste, viene conservata quella più recente in attesa. Il carico aumenta temporaneamente; la dissolvenza non garantisce che ogni combinazione di catture, fase e carico CPU risulti inudibile. Una coda del riverbero precedente può continuare; vedi PALCO per limiti e comportamento.
 
@@ -135,11 +137,11 @@ Senza una IR caricata, attivare REVERB ON non crea un riverbero. Il file determi
 La normalizzazione delle IR è gestita dal motore di convoluzione; non equivale a pareggiare automaticamente il volume dei modelli NAM. Il timing iniziale della IR viene conservato. Una IR lunga può richiedere più risorse: se senti interruzioni, prova una IR più corta o aumenta il buffer.
 
 ## 09 · Preset, file e trascinamento
-SALVA crea un preset .lowline leggero con controlli, lingua e percorsi assoluti ai file NAM/IR. Mappa MIDI e banco Program Change non stanno nei preset: appartengono alla tua pedaliera (vedi MIDI). Le sessioni della DAW conservano lo stesso stato. APRI richiama sia preset normali sia portabili.
+SALVA crea un preset .radice leggero con controlli, lingua e percorsi assoluti ai file NAM/IR. Mappa MIDI e banco Program Change non stanno nei preset: appartengono alla tua pedaliera (vedi MIDI). Le sessioni della DAW conservano lo stesso stato. APRI richiama sia preset normali sia portabili.
 
-ESPORTA crea un .lowline portabile che include copie dei modelli e delle IR caricate nei quattro slot. Il limite è 64 MB per asset e 192 MB totali; se manca un file o supera il limite, l'esportazione viene annullata. Attendi che Loading sia terminato prima di salvare. Incorpora e condividi soltanto asset che hai diritto di ridistribuire.
+ESPORTA crea un .radice portabile che include copie dei modelli e delle IR caricate nei quattro slot. Il limite è 64 MB per asset e 192 MB totali; se manca un file o supera il limite, l'esportazione viene annullata. Attendi che Loading sia terminato prima di salvare. Incorpora e condividi soltanto asset che hai diritto di ridistribuire.
 
-All'apertura gli asset incorporati vengono estratti in una cache persistente Lowline/Assets nella cartella dati dell'utente. Non servono più i percorsi originali. I successivi salvataggi normali fanno riferimento alla cache: usa nuovamente ESPORTA per trasferirli. I percorsi verso altri preset assegnati ai Program Change non sono incorporati ricorsivamente; trasferisci anche quei preset e riassegnali se necessario.
+All'apertura gli asset incorporati vengono estratti in una cache persistente Radice/Assets nella cartella dati dell'utente. Non servono più i percorsi originali. I successivi salvataggi normali fanno riferimento alla cache: usa nuovamente ESPORTA per trasferirli. I percorsi verso altri preset assegnati ai Program Change non sono incorporati ricorsivamente; trasferisci anche quei preset e riassegnali se necessario.
 
 Per conservare un suono: tieni gli asset in una cartella stabile, salva il preset e annota quali file usi. Per trasferire un preset normale copia anche gli asset e ricaricali; in alternativa usa ESPORTA per ottenere un unico file portabile.
 
@@ -149,16 +151,16 @@ Trascinamento:
 • Un file lasciato su una riga di slot (PEDAL, AMP, CAB, ROOM) va in quello slot; altrove un .nam va in AMP.
 • La finestra si ridimensiona trascinando l'angolo: l'interfaccia si scala mantenendo le proporzioni (dal 50 % al 200 %). Alla prima apertura si adatta allo schermo; poi ricorda l'ultima dimensione.
 • Una IR nella zona superiore va a CAB; nella riga inferiore degli effetti va a ROOM.
-• Un .lowline apre il preset.
+• Un .radice apre il preset.
 
 Le quattro configurazioni di fabbrica sono punti di partenza: Clean foundation, Warm edge, Wide ambience e Direct / DI. Non caricano asset e mantengono selezione dell'ingresso e calibrazione INPUT/OUTPUT. Direct / DI usa il ramo pulito ma conserva il compressore; Wide ambience richiede una IR per il riverbero. Richiamare una configurazione può sovrascrivere le regolazioni sonore: salva prima il tuo lavoro.
 
 ## 10 · MIDI e pedaliere
-Nell'app autonoma abilita il controller nelle impostazioni Audio/MIDI. Nel plugin instrada il MIDI dalla DAW a Lowline; la procedura dipende dal programma ospite. Lowline accetta tutti i canali MIDI.
+Nell'app autonoma abilita il controller nelle impostazioni Audio/MIDI. Nel plugin instrada il MIDI dalla DAW a Radice; la procedura dipende dal programma ospite. Radice accetta tutti i canali MIDI.
 
-Program Change 0…3 richiama, nell'ordine, i quattro preset di fabbrica. Alcune pedaliere li mostrano come 1…4: controlla il messaggio realmente trasmesso. Nella scheda MIDI puoi assegnare un file .lowline a qualsiasi PC 0…127: scegli il numero, premi ASSEGNA PRESET e seleziona il file. CLEAR PC rimuove l'abbinamento. Un abbinamento personale prevale sul preset di fabbrica; i numeri senza abbinamento oltre 3 vengono ignorati. Il caricamento avviene nel worker, quindi include il tempo necessario a leggere e preparare i file.
+Program Change 0…3 richiama, nell'ordine, i quattro preset di fabbrica. Alcune pedaliere li mostrano come 1…4: controlla il messaggio realmente trasmesso. Nella scheda MIDI puoi assegnare un file .radice a qualsiasi PC 0…127: scegli il numero, premi ASSEGNA PRESET e seleziona il file. CLEAR PC rimuove l'abbinamento. Un abbinamento personale prevale sul preset di fabbrica; i numeri senza abbinamento oltre 3 vengono ignorati. Il caricamento avviene nel worker, quindi include il tempo necessario a leggere e preparare i file.
 
-Mappa MIDI, modalità dei pulsanti e banco PC sono globali: si salvano da soli a ogni modifica in un unico file (Lowline/midi-controller.xml nella cartella dati utente) usato dall'app e da ogni istanza del plugin. Aprire un preset, anche ricevuto da altri, non li cambia mai. Alla prima apertura della 0.3.2 la mappa salvata nel tuo ultimo preset o sessione viene adottata una volta come punto di partenza.
+Mappa MIDI, modalità dei pulsanti e banco PC sono globali: si salvano da soli a ogni modifica in un unico file (Radice/midi-controller.xml nella cartella dati utente) usato dall'app e da ogni istanza del plugin. Aprire un preset, anche ricevuto da altri, non li cambia mai. Alla prima apertura della 0.3.2 la mappa salvata nel tuo ultimo preset o sessione viene adottata una volta come punto di partenza.
 
 Control Change (CC):
 20 = compressore
@@ -178,17 +180,17 @@ MIDI LEARN: scegli il parametro nel menu, premi LEARN e muovi il controllo della
 
 I controlli continui usano l'intervallo completo del parametro con valori 0…127; quindi OUTPUT appreso via learn raggiunge +12 dB, mentre il CC 7 predefinito mantiene il limite storico di +6 dB. I pulsanti usano 0…63 spento e 64…127 acceso. Tap tempo reagisce al passaggio dal valore basso a quello alto: la pedaliera deve inviare anche il rilascio.
 
-Un pedale d'espressione può controllare blend, output o altri parametri. Calibra il suo intervallo sulla pedaliera: Lowline non offre ancora calibrazione min/max o curve personalizzate. Le associazioni accettano tutti i canali; i messaggi si applicano all'inizio del blocco audio, non al singolo campione.
+Un pedale d'espressione può controllare blend, output o altri parametri. Calibra il suo intervallo sulla pedaliera: Radice non offre ancora calibrazione min/max o curve personalizzate. Le associazioni accettano tutti i canali; i messaggi si applicano all'inizio del blocco audio, non al singolo campione.
 
 ## 11 · Uso come plugin su Mac, Windows e Linux
 Standalone è l'app autonoma. VST3 è il plugin per un host compatibile; AU è il formato Mac usato, per esempio, da GarageBand e Logic. Installa soltanto i formati che ti servono.
 
 Su Mac le cartelle utente abituali sono:
-~/Library/Audio/Plug-Ins/Components/ per Lowline.component (AU)
-~/Library/Audio/Plug-Ins/VST3/ per Lowline.vst3
+~/Library/Audio/Plug-Ins/Components/ per Radice.component (AU)
+~/Library/Audio/Plug-Ins/VST3/ per Radice.vst3
 La cartella Library è nella tua Home; nel Finder usa Vai → Vai alla cartella per raggiungerla.
 
-Dopo aver copiato il bundle, riavvia il programma ospite o avvia una nuova scansione dei plugin. Inserisci Lowline su una traccia audio del basso, seleziona l'ingresso corretto della Scarlett e abilita il monitoraggio della traccia. Audio device e buffer si impostano nella DAW quando usi il plugin. Evita di ascoltare contemporaneamente l'app autonoma, il direct monitoring e il monitoraggio della DAW.
+Dopo aver copiato il bundle, riavvia il programma ospite o avvia una nuova scansione dei plugin. Inserisci Radice su una traccia audio del basso, seleziona l'ingresso corretto della Scarlett e abilita il monitoraggio della traccia. Audio device e buffer si impostano nella DAW quando usi il plugin. Evita di ascoltare contemporaneamente l'app autonoma, il direct monitoring e il monitoraggio della DAW.
 
 Per usare il ping-pong e le IR stereo scegli un'uscita stereo. Con uscita mono i canali vengono sommati e l'ampiezza stereo si perde.
 
@@ -214,13 +216,13 @@ Limiti attuali: normalizzazione NAM solo quando è presente un loudness valido; 
 Le build automatiche verificano il software con segnali sintetici e modelli di prova. Latenza, drop-out, accuratezza su bassi reali e risultato all'ascolto devono essere provati sulla Scarlett e nel tuo host. Inizia con buffer 256 e volume basso; prova poi 128 se il sistema rimane stabile.
 
 ## 13 · Libreria, preferiti e preset
-Apri AREA STUDIO → LIBRERIA. AGGIUNGI FILE inserisce catture NAM, IR o preset .lowline; SCANSIONA CARTELLA cerca anche nelle sottocartelle, senza seguire collegamenti simbolici, fino a 10.000 file per scansione. La scansione avviene in background. I file non vengono copiati: non spostarli dopo averli indicizzati. Una voce rossa [MISSING] segnala un percorso non più disponibile; rimuovila dall'elenco e aggiungi il nuovo percorso.
+Apri AREA STUDIO → LIBRERIA. AGGIUNGI FILE inserisce catture NAM, IR o preset .radice; SCANSIONA CARTELLA cerca anche nelle sottocartelle, senza seguire collegamenti simbolici, fino a 10.000 file per scansione. La scansione avviene in background. I file non vengono copiati: non spostarli dopo averli indicizzati. Una voce rossa [MISSING] segnala un percorso non più disponibile; rimuovila dall'elenco e aggiungi il nuovo percorso.
 
 Scegli NAM, IR o Preset e cerca nel nome, nel percorso o nei tag. PREFERITO +/- modifica la stella; Solo preferiti filtra l'elenco e Ordina per recenti porta in alto gli ultimi elementi caricati. Doppio clic o CARICA apre la selezione; le frecce percorrono l'ordine corrente. Il selettore Pedal/Amp/Cab/Room sceglie la destinazione: un NAM viene sempre indirizzato a uno slot NAM e un IR a uno slot IR. MOSTRA FILE apre la cartella nel sistema operativo. RIMUOVI DALLA LISTA non cancella il file.
 
-Il campo accanto a TAG VOCE assegna tag alla voce selezionata. I tag del catalogo sono locali; quelli del preset sono separati. Caricando un preset si importano nel catalogo il suo nome e i suoi tag. Il catalogo viene conservato nei dati utente di Lowline; preferiti e recenti non vengono incorporati nei preset portabili. Evita modifiche simultanee del catalogo in più istanze: viene mantenuto l'ultimo salvataggio.
+Il campo accanto a TAG VOCE assegna tag alla voce selezionata. I tag del catalogo sono locali; quelli del preset sono separati. Caricando un preset si importano nel catalogo il suo nome e i suoi tag. Il catalogo viene conservato nei dati utente di Radice; preferiti e recenti non vengono incorporati nei preset portabili. Evita modifiche simultanee del catalogo in più istanze: viene mantenuto l'ultimo salvataggio.
 
-A destra puoi modificare nome, tag e descrizione del preset CORRENTE. Premi APPLICA DATI PRESET, poi SALVA o ESPORTA nel rig. Questi dati accompagnano il file .lowline. ANNULLA/RIPRISTINA agisce su ciò che fai nell'interfaccia: manopole, pulsanti, menu, preset di fabbrica, richiami A/B e dati editoriali. I cambiamenti da MIDI, automazione della DAW e TAP non entrano nella cronologia; non annulla il caricamento dei file, la registrazione o le operazioni del catalogo. Ogni gesto (un trascinamento, un clic) è un passo. La cronologia è temporanea e riparte all'apertura di un preset. L'asterisco nella pagina PALCO indica modifiche rispetto all'ultimo salvataggio/apertura; i controlli dello studio e la compensazione A/B sono temporanei e non fanno parte di quel preset.
+A destra puoi modificare nome, tag e descrizione del preset CORRENTE. Premi APPLICA DATI PRESET, poi SALVA o ESPORTA nel rig. Questi dati accompagnano il file .radice. ANNULLA/RIPRISTINA agisce su ciò che fai nell'interfaccia: manopole, pulsanti, menu, preset di fabbrica, richiami A/B e dati editoriali. I cambiamenti da MIDI, automazione della DAW e TAP non entrano nella cronologia; non annulla il caricamento dei file, la registrazione o le operazioni del catalogo. Ogni gesto (un trascinamento, un clic) è un passo. La cronologia è temporanea e riparte all'apertura di un preset. L'asterisco nella pagina PALCO indica modifiche rispetto all'ultimo salvataggio/apertura; i controlli dello studio e la compensazione A/B sono temporanei e non fanno parte di quel preset.
 
 ## 14 · Confronto A/B e volume misurato
 AREA STUDIO → CONFRONTO A/B conserva due istantanee temporanee di controlli e percorsi delle quattro catture. MEMORIZZA A/B sostituisce la rispettiva istantanea; ASCOLTA A/B la richiama. Attendi il caricamento dei modelli. Le istantanee non contengono i file e non sopravvivono alla chiusura dell'istanza: usa SALVA per conservarle. Non sono due rig elaborati continuamente in parallelo.
@@ -239,9 +241,9 @@ VELOCITÀ varia fra 0,50 e 1,50. Premi APPLICA VELOCITÀ: il file viene rielabor
 Il metronomo ha tempo 30–300 BPM, volume, misura da 2 a 7 pulsazioni e tre scelte di accento: nessuno, primo battito, oppure 2 e 4. Per il walking bass scegli misura 4 e accenti 2 e 4. Senza base parte dal primo battito quando viene attivato. Per agganciarlo a una base: imposta i BPM della canzone, avvia la base e premi BATTITO 1 QUI esattamente su un primo battito (o fai seek su quel punto e premi). Da quel momento, mentre la base suona, i click seguono la sua posizione: restano a tempo anche cambiando velocità, con seek e nei loop. Premi di nuovo per correggere il punto. Resta indipendente dal tempo host e dal TAP del delay. Il numero Beat mostra la pulsazione corrente. In un plugin, base e click suonano soltanto quando l'host continua a elaborare audio.
 
 ## 16 · Registrazione rapida DI + FX
-REGISTRA DI + FX apre la scelta di nome e cartella. Dal nome scelto vengono creati due file: nome-DI.wav mono e nome-FX.wav stereo. Entrambi sono WAV a 32 bit float alla frequenza corrente dell'interfaccia/host. Il float conserva anche valori oltre 0 dBFS: abbassa il volume quando li importi in un altro programma. Lowline rifiuta di sovrascrivere una coppia già esistente.
+REGISTRA DI + FX apre la scelta di nome e cartella. Dal nome scelto vengono creati due file: nome-DI.wav mono e nome-FX.wav stereo. Entrambi sono WAV a 32 bit float alla frequenza corrente dell'interfaccia/host. Il float conserva anche valori oltre 0 dBFS: abbassa il volume quando li importi in un altro programma. Radice rifiuta di sovrascrivere una coppia già esistente.
 
-DI contiene l'ingresso selezionato prima di INPUT, gate, compressore ed effetti. FX contiene il basso elaborato e l'eventuale trim A/B, prima del limiter finale e del mute dell'accordatore. Base e metronomo non sono inclusi: sono strumenti di ascolto durante la registrazione. La coppia non include la latenza hardware; alcuni modelli/IR possono introdurre propri ritardi. Usa DI per rielaborare il suono in seguito nella tua DAW, con Lowline come plugin.
+DI contiene l'ingresso selezionato prima di INPUT, gate, compressore ed effetti. FX contiene il basso elaborato e l'eventuale trim A/B, prima del limiter finale e del mute dell'accordatore. Base e metronomo non sono inclusi: sono strumenti di ascolto durante la registrazione. La coppia non include la latenza hardware; alcuni modelli/IR possono introdurre propri ritardi. Usa DI per rielaborare il suono in seguito nella tua DAW, con Radice come plugin.
 
 FERMA REGISTRAZIONE svuota le code di scrittura e finalizza i WAV. Anche un cambio di configurazione audio o la chiusura dell'istanza interrompe la registrazione. La scrittura su disco è delegata a un thread; il contatore dropped blocks segnala eventuali blocchi persi per sovraccarico. Se è diverso da zero, la take potrebbe avere interruzioni o disallineamenti: ripeti con un buffer maggiore e un disco disponibile. Registra una breve prova prima di una take importante. Il bypass dell'host non alimenta queste funzioni; evita di attivarlo durante una take. Il pulsante BYPASS interno lascia invece attivo il percorso di registrazione.
 
@@ -259,8 +261,8 @@ AUDIO / APP mostra versione, sistema operativo, sample rate, massimo blocco prep
 
 La configurazione guidata ricorda di scegliere ingresso e uscita della stessa interfaccia, il canale corretto, INST e direct monitoring. Le vere impostazioni del dispositivo restano nel menu Options dello standalone o nella DAW. Il valore di un buffer non è la latenza di andata e ritorno: servono anche i buffer di ingresso/uscita, i driver e i convertitori. Per misurarla occorre una prova fisica di loopback.
 
-I download Mac sono disponibili come ZIP e DMG. Il pacchetto include README-INSTALL.txt e Install-Lowline.command: chiudi app e DAW, poi usa il comando per copiare app e plugin nelle cartelle del tuo utente senza sudo. Le copie precedenti vengono rinominate con un suffisso di backup. È possibile anche copiare manualmente i bundle. Le note di ogni Release indicano se il pacchetto Mac è firmato con Developer ID e notarizzato. Se non lo è, non disattivare Gatekeeper: consulta le istruzioni del pacchetto e le opzioni di Privacy e sicurezza di macOS.
+I download Mac sono disponibili come ZIP e DMG. Il pacchetto include README-INSTALL.txt e Install-Radice.command: chiudi app e DAW, poi usa il comando per copiare app e plugin nelle cartelle del tuo utente senza sudo. Le copie precedenti vengono rinominate con un suffisso di backup. È possibile anche copiare manualmente i bundle. Le note di ogni Release indicano se il pacchetto Mac è firmato con Developer ID e notarizzato. Se non lo è, non disattivare Gatekeeper: consulta le istruzioni del pacchetto e le opzioni di Privacy e sicurezza di macOS.
 
 CONTROLLA AGGIORNAMENTI apre nel browser la pagina della Release più recente. Confronta il numero con quello visualizzato nell'app; non vengono scaricati o installati aggiornamenti automaticamente e non viene eseguito alcun controllo periodico. Per gli sviluppatori scripts/sign-mac.sh prepara il percorso di firma e notarizzazione con un'identità e un profilo notarytool già configurati nel Portachiavi: richiede un account Apple Developer e una verifica su Mac, la CI lo usa da sola quando nel repository sono configurati i segreti Apple.
 
-iPad e iPhone: Lowline esiste come app e come AUv3 (AUM, GarageBand, Loopy Pro, Cubasis), in orizzontale. Collega l'interfaccia via USB-C o Lightning, apri AUDIO per scegliere ingresso e buffer e togli il mute dell'ingresso (JUCE lo attiva per evitare fischi; Lowline ricorda la tua scelta, usa le cuffie). I file scelti da Files vengono copiati in "Sul mio iPad › Lowline" (cartelle Captures, IRs, Presets, Library, Backing): puoi anche trascinarli lì direttamente e usare AGGIUNGI CARTELLA nella libreria. SALVA chiede solo un nome e scrive in Presets; le registrazioni vanno in Recordings. I preset continuano a trovare i file dopo un aggiornamento dell'app. BLUETOOTH MIDI (pagina MIDI) collega pedaliere wireless. Nell'AUv3 la guida si apre dentro l'interfaccia e i file importati restano nello spazio del plugin.
+iPad e iPhone: Radice esiste come app e come AUv3 (AUM, GarageBand, Loopy Pro, Cubasis), in orizzontale. Collega l'interfaccia via USB-C o Lightning, apri AUDIO per scegliere ingresso e buffer e togli il mute dell'ingresso (JUCE lo attiva per evitare fischi; Radice ricorda la tua scelta, usa le cuffie). I file scelti da Files vengono copiati in "Sul mio iPad › Radice" (cartelle Captures, IRs, Presets, Library, Backing): puoi anche trascinarli lì direttamente e usare AGGIUNGI CARTELLA nella libreria. SALVA chiede solo un nome e scrive in Presets; le registrazioni vanno in Recordings. I preset continuano a trovare i file dopo un aggiornamento dell'app. BLUETOOTH MIDI (pagina MIDI) collega pedaliere wireless. Nell'AUv3 la guida si apre dentro l'interfaccia e i file importati restano nello spazio del plugin.

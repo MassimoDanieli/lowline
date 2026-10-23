@@ -1,6 +1,8 @@
-# Validation — Lowline 0.3.0
+# Validation — Radice 0.5.0 (formerly Lowline)
 
-Verified source: `e6866c64e7505d48c91050501b9eab242e8d0356`. [Native builds run 39188625927](https://github.com/MassimoDanieli/lowline/actions/runs/39188625927) passed compilation and regression tests on macOS universal, Windows x64 and Linux x64. The local screenshot run passed 170 assertions, including navigation/render checks.
+Each release is published only after the Native builds workflow passes on macOS universal, Windows x64 and Linux x64 (build, regression tests, pluginval strictness 10, auval on macOS). The iOS app/AUv3 compile check runs in the same workflow but does not gate publication. The 0.3.0 baseline below was verified on source `e6866c64e7505d48c91050501b9eab242e8d0356` in [run 39188625927](https://github.com/MassimoDanieli/radice/actions/runs/39188625927).
+
+0.5 adds regression checks for: a session restored while the host changes block size keeps its models; saving a session keeps the path of a missing file; MIDI controllers work during host bypass; a factory Program Change from the audio thread is applied on the message thread and is not an undo step; settings migration from Lowline (including the standalone app's audio setup); .radice and .lowline presets both open.
 
 ## Verification scope
 
