@@ -1,4 +1,4 @@
-# Radice 0.5.0 — Bass NAM + IR rig
+# Radice 0.5.1 — Bass NAM + IR rig
 
 A free, open-source native bass rig for macOS (Apple Silicon + Intel), Windows x64 and Linux x64, plus an iPad/iPhone app and AUv3. Standalone and VST3; AU is also built for macOS. Original project for Massimo Danieli, not affiliated with NamRay, Neural Amp Modeler or TONE3000.
 
@@ -15,6 +15,8 @@ App pronta all'uso: non serve compilare. / Ready-built app: no compilation neede
 ![Radice rig](preview.png)
 
 ## New in 0.5
+
+- **0.5.1 — iPad and iPhone:** Radice launches on iPadOS/iOS 27 (it closed at once before), the AUDIO settings open inside the interface and close with OK, and the app is ready for TestFlight. Desktop builds move to JUCE 8.0.16 as well.
 
 - **New name:** Lowline is now Radice — the root note, the one the bass plays.
 - **DAW sessions:** a session no longer opens silent when the host changes sample rate or buffer while models load, and saving no longer erases the path of a capture that is missing on this machine.

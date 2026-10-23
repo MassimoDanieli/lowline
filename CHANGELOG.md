@@ -1,3 +1,14 @@
+# 0.5.1
+
+**iPad and iPhone**
+- Radice launches on iPadOS / iOS 27. Apps built with the iOS 27 SDK must use the UIScene life cycle or they close at once; JUCE is updated from 8.0.6 to 8.0.16, which adopts it. CI now fails if the scene manifest is missing.
+- AUDIO opens the audio and MIDI settings inside the interface, with an OK button and the input mute switch. Before, the settings window had no way to close on iOS.
+- Apple privacy manifest in the app and the AUv3 (required to upload to App Store Connect / TestFlight).
+- Debug symbols (dSYM) for the app and the AUv3, so TestFlight crash reports show function names.
+
+**All platforms**
+- JUCE 8.0.16: framework fixes since 8.0.6, including a String security fix.
+
 # 0.5.0
 
 **Lowline is now Radice**
